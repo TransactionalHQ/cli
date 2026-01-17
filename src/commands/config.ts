@@ -101,7 +101,7 @@ export function createConfigCommand(): Command {
     .action(() => {
       saveConfig({
         apiUrl: 'https://api.usetransactional.com',
-        webUrl: 'https://app.usetransactional.com',
+        webUrl: 'https://usetransactional.com',
         outputFormat: 'table',
         color: true,
       });

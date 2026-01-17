@@ -24,7 +24,7 @@ var CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 var CREDENTIALS_FILE = path.join(CONFIG_DIR, "credentials.json");
 var DEFAULT_CONFIG = {
   apiUrl: "https://api.usetransactional.com",
-  webUrl: "https://app.usetransactional.com",
+  webUrl: "https://usetransactional.com",
   outputFormat: "table",
   color: true
 };
@@ -1462,7 +1462,7 @@ function createConfigCommand() {
   configCmd.command("reset").description("Reset configuration to defaults").action(() => {
     saveConfig({
       apiUrl: "https://api.usetransactional.com",
-      webUrl: "https://app.usetransactional.com",
+      webUrl: "https://usetransactional.com",
       outputFormat: "table",
       color: true
     });
