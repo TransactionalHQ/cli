@@ -19,6 +19,7 @@ import { printSuccess, printError, print } from '../output';
 // =============================================================================
 
 interface McpServerConfig {
+  type: 'http';
   url: string;
 }
 
@@ -188,6 +189,7 @@ export function createMcpCommand(): Command {
         config = {
           mcpServers: {
             transactional: {
+              type: 'http',
               url: mcpUrl,
             },
           },
@@ -283,10 +285,11 @@ export function createMcpCommand(): Command {
               continue;
             }
 
-            // Claude Code supports URL-based OAuth
+            // Claude Code supports URL-based OAuth with HTTP transport
             existingConfig.mcpServers = {
               ...existingConfig.mcpServers,
               transactional: {
+                type: 'http',
                 url: mcpUrl,
               },
             };

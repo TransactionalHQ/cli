@@ -1350,6 +1350,7 @@ function createMcpCommand() {
       config = {
         mcpServers: {
           transactional: {
+            type: "http",
             url: mcpUrl
           }
         }
@@ -1431,6 +1432,7 @@ function createMcpCommand() {
           existingConfig.mcpServers = {
             ...existingConfig.mcpServers,
             transactional: {
+              type: "http",
               url: mcpUrl
             }
           };
