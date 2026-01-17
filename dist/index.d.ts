@@ -573,6 +573,18 @@ declare function createEmailCommand(): Command;
 declare function createConfigCommand(): Command;
 
 /**
+ * MCP Commands
+ *
+ * Commands for setting up MCP (Model Context Protocol) integration.
+ * Supports Claude Desktop (paid and free tiers) and Claude Code.
+ */
+
+/**
+ * Create the mcp command
+ */
+declare function createMcpCommand(): Command;
+
+/**
  * CLI Output Formatting
  *
  * Functions for formatting and displaying CLI output.
@@ -680,4 +692,4 @@ declare function editor(message: string, options?: {
  */
 declare function createProgram(): Command;
 
-export { ApiClient, type ApiErrorResponse, type ApiKeyInfo, type ApiResponse, type BillingUsage, type CliConfig, CliSessionType, type CommandResult, type CreateApiKeyResult, type DnsRecord, type DomainCreateResponse, type EmailDomain, type EmailSendOptions, type EmailSendResult, type EmailSender, type EmailServer, type EmailStats, type EmailStream, type EmailSuppression, type EmailTemplate, type Invoice, type OrgMember, type OrganizationInfo, type OutputFormat, type PlanInfo, type StoredCredentials, type UserInfo, type WhoamiResponse, clearCredentials, confirm, createConfigCommand, createEmailCommand, createLoginCommand, createLogoutCommand, createOrgsCommand, createProgram, createSwitchCommand, createWhoamiCommand, editor, emailInput, formatOutput, getApiClient, getApiUrl, getConfig, getConfigDir, getCredentialsFile, getCurrentOrganization, getOutputFormat, getToken, getUserInfo, getWebUrl, initConfig, input, isAuthenticated, isColorEnabled, isLoggedIn, listOrganizations, loadConfig, loadCredentials, login, logout, multiSelect, password, print, printError, printHeading, printInfo, printKeyValue, printSuccess, printWarning, saveConfig, saveCredentials, select, selectOrganization, setCurrentOrganization, storeToken, storeUserInfo, switchOrganization, whoami };
+export { ApiClient, type ApiErrorResponse, type ApiKeyInfo, type ApiResponse, type BillingUsage, type CliConfig, CliSessionType, type CommandResult, type CreateApiKeyResult, type DnsRecord, type DomainCreateResponse, type EmailDomain, type EmailSendOptions, type EmailSendResult, type EmailSender, type EmailServer, type EmailStats, type EmailStream, type EmailSuppression, type EmailTemplate, type Invoice, type OrgMember, type OrganizationInfo, type OutputFormat, type PlanInfo, type StoredCredentials, type UserInfo, type WhoamiResponse, clearCredentials, confirm, createConfigCommand, createEmailCommand, createLoginCommand, createLogoutCommand, createMcpCommand, createOrgsCommand, createProgram, createSwitchCommand, createWhoamiCommand, editor, emailInput, formatOutput, getApiClient, getApiUrl, getConfig, getConfigDir, getCredentialsFile, getCurrentOrganization, getOutputFormat, getToken, getUserInfo, getWebUrl, initConfig, input, isAuthenticated, isColorEnabled, isLoggedIn, listOrganizations, loadConfig, loadCredentials, login, logout, multiSelect, password, print, printError, printHeading, printInfo, printKeyValue, printSuccess, printWarning, saveConfig, saveCredentials, select, selectOrganization, setCurrentOrganization, storeToken, storeUserInfo, switchOrganization, whoami };

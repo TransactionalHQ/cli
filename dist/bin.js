@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import * as path2 from 'path';
+import * as os2 from 'os';
 import open from 'open';
 import ora2 from 'ora';
-import chalk from 'chalk';
+import chalk4 from 'chalk';
 import Table from 'cli-table3';
 import yaml from 'yaml';
 import inquirer from 'inquirer';
 
-var CONFIG_DIR = path.join(os.homedir(), ".transactional");
-var CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
-var CREDENTIALS_FILE = path.join(CONFIG_DIR, "credentials.json");
+var CONFIG_DIR = path2.join(os2.homedir(), ".transactional");
+var CONFIG_FILE = path2.join(CONFIG_DIR, "config.json");
+var CREDENTIALS_FILE = path2.join(CONFIG_DIR, "credentials.json");
 var DEFAULT_CONFIG = {
   apiUrl: "https://api.usetransactional.com",
   webUrl: "https://usetransactional.com",
@@ -195,8 +195,8 @@ var ApiClient = class {
   /**
    * Build URL with query parameters
    */
-  buildUrl(path2, params) {
-    const url = new URL(path2, this.apiUrl);
+  buildUrl(path3, params) {
+    const url = new URL(path3, this.apiUrl);
     if (params) {
       for (const [key, value] of Object.entries(params)) {
         if (value !== void 0 && value !== null) {
@@ -209,9 +209,9 @@ var ApiClient = class {
   /**
    * Make an HTTP request
    */
-  async request(method, path2, options) {
+  async request(method, path3, options) {
     try {
-      const url = this.buildUrl(path2, options?.params);
+      const url = this.buildUrl(path3, options?.params);
       const init = {
         method,
         headers: this.getHeaders()
@@ -276,32 +276,32 @@ var ApiClient = class {
   /**
    * GET request
    */
-  async get(path2, params) {
-    return this.request("GET", path2, { params });
+  async get(path3, params) {
+    return this.request("GET", path3, { params });
   }
   /**
    * POST request
    */
-  async post(path2, body) {
-    return this.request("POST", path2, { body });
+  async post(path3, body) {
+    return this.request("POST", path3, { body });
   }
   /**
    * PUT request
    */
-  async put(path2, body) {
-    return this.request("PUT", path2, { body });
+  async put(path3, body) {
+    return this.request("PUT", path3, { body });
   }
   /**
    * PATCH request
    */
-  async patch(path2, body) {
-    return this.request("PATCH", path2, { body });
+  async patch(path3, body) {
+    return this.request("PATCH", path3, { body });
   }
   /**
    * DELETE request
    */
-  async delete(path2) {
-    return this.request("DELETE", path2);
+  async delete(path3) {
+    return this.request("DELETE", path3);
   }
 };
 function getApiClient(orgSlug) {
@@ -443,7 +443,7 @@ function formatAsTable(data) {
     }
     const columns = Object.keys(data[0]);
     const table = new Table({
-      head: columns.map((c) => isColorEnabled() ? chalk.bold(c) : c),
+      head: columns.map((c) => isColorEnabled() ? chalk4.bold(c) : c),
       style: {
         head: isColorEnabled() ? ["cyan"] : [],
         border: isColorEnabled() ? ["gray"] : []
@@ -461,7 +461,7 @@ function formatAsTable(data) {
       }
     });
     for (const [key, value] of Object.entries(data)) {
-      const formattedKey = isColorEnabled() ? chalk.bold(key) : key;
+      const formattedKey = isColorEnabled() ? chalk4.bold(key) : key;
       table.push({ [formattedKey]: formatValue(value) });
     }
     return table.toString();
@@ -470,11 +470,11 @@ function formatAsTable(data) {
 }
 function formatValue(value) {
   if (value === null || value === void 0) {
-    return isColorEnabled() ? chalk.gray("-") : "-";
+    return isColorEnabled() ? chalk4.gray("-") : "-";
   }
   if (typeof value === "boolean") {
     if (isColorEnabled()) {
-      return value ? chalk.green("Yes") : chalk.red("No");
+      return value ? chalk4.green("Yes") : chalk4.red("No");
     }
     return value ? "Yes" : "No";
   }
@@ -491,14 +491,14 @@ function formatValue(value) {
 }
 function printSuccess(message) {
   if (isColorEnabled()) {
-    console.log(chalk.green("\u2713"), message);
+    console.log(chalk4.green("\u2713"), message);
   } else {
     console.log("[OK]", message);
   }
 }
 function printError(message, details) {
   if (isColorEnabled()) {
-    console.error(chalk.red("\u2717"), message);
+    console.error(chalk4.red("\u2717"), message);
   } else {
     console.error("[ERROR]", message);
   }
@@ -506,7 +506,7 @@ function printError(message, details) {
 function printKeyValue(key, value) {
   const formattedValue = formatValue(value);
   if (isColorEnabled()) {
-    console.log(`${chalk.gray(key + ":")} ${formattedValue}`);
+    console.log(`${chalk4.gray(key + ":")} ${formattedValue}`);
   } else {
     console.log(`${key}: ${formattedValue}`);
   }
@@ -557,10 +557,10 @@ function createLoginCommand() {
     const result = await login(options.mcp ? "MCP" : "CLI", {
       onDeviceCode: (userCode, verificationUrl) => {
         console.log();
-        console.log(chalk.bold("To complete authentication:"));
+        console.log(chalk4.bold("To complete authentication:"));
         console.log();
-        console.log(`  1. Visit: ${chalk.cyan(verificationUrl)}`);
-        console.log(`  2. Verify this code matches: ${chalk.bold.yellow(formatUserCode(userCode))}`);
+        console.log(`  1. Visit: ${chalk4.cyan(verificationUrl)}`);
+        console.log(`  2. Verify this code matches: ${chalk4.bold.yellow(formatUserCode(userCode))}`);
         console.log(`  3. Click "Authorize" in your browser`);
         console.log();
       },
@@ -752,14 +752,14 @@ function createOrgsCommand() {
 }
 function printInfo(message) {
   if (isColorEnabled()) {
-    console.log(chalk.blue("\u2139"), message);
+    console.log(chalk4.blue("\u2139"), message);
   } else {
     console.log("[INFO]", message);
   }
 }
 function printHeading(title) {
   if (isColorEnabled()) {
-    console.log(chalk.bold.underline(title));
+    console.log(chalk4.bold.underline(title));
   } else {
     console.log(`=== ${title} ===`);
   }
@@ -1265,10 +1265,270 @@ function createConfigCommand() {
 }
 function printHeading2(title) {
   if (isColorEnabled()) {
-    console.log(chalk.bold.underline(title));
+    console.log(chalk4.bold.underline(title));
   } else {
     console.log(`=== ${title} ===`);
   }
+}
+function getClaudeDesktopConfigPath() {
+  const platform2 = os2.platform();
+  const homeDir = os2.homedir();
+  if (platform2 === "darwin") {
+    return path2.join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+  } else if (platform2 === "win32") {
+    return path2.join(homeDir, "AppData", "Roaming", "Claude", "claude_desktop_config.json");
+  } else {
+    return path2.join(homeDir, ".config", "claude", "claude_desktop_config.json");
+  }
+}
+function getClaudeCodeConfigPath() {
+  const homeDir = os2.homedir();
+  return path2.join(homeDir, ".claude.json");
+}
+function getMcpServerUrl() {
+  const apiUrl = getApiUrl();
+  if (apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1")) {
+    return apiUrl.replace(/\/$/, "") + "/mcp";
+  }
+  return process.env.MCP_SERVER_URL || "https://mcp.usetransactional.com/mcp";
+}
+function readJsonConfig(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+    const content = fs.readFileSync(filePath, "utf-8");
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+function writeJsonConfig(filePath, config) {
+  const dir = path2.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(filePath, JSON.stringify(config, null, 2) + "\n");
+}
+function printWarning(message) {
+  if (isColorEnabled()) {
+    console.log(chalk4.yellow("\u26A0"), message);
+  } else {
+    console.log("[WARN]", message);
+  }
+}
+function createMcpCommand() {
+  const mcpCmd = new Command("mcp").description("MCP (Model Context Protocol) integration");
+  mcpCmd.command("setup").description("Show MCP setup instructions").action(() => {
+    const mcpUrl = getMcpServerUrl();
+    console.log("\n\u{1F4E1} Transactional MCP Server Setup\n");
+    console.log("The MCP server allows Claude and other AI assistants to");
+    console.log("interact with your Transactional account.\n");
+    console.log(chalk4.bold("MCP Server URL:"));
+    console.log(`  ${chalk4.cyan(mcpUrl)}
+`);
+    console.log(chalk4.bold("Setup Options:\n"));
+    console.log(chalk4.underline("1. Claude Desktop (Pro/Max/Team/Enterprise)"));
+    console.log("   Go to Settings \u2192 Integrations \u2192 Add Custom Integration");
+    console.log(`   Enter URL: ${chalk4.cyan(mcpUrl.replace("/mcp", ""))}`);
+    console.log("   Claude will handle OAuth authorization automatically.\n");
+    console.log(chalk4.underline("2. Claude Desktop (Free/JSON Config)"));
+    console.log("   Run: transactional mcp install --target claude-desktop\n");
+    console.log(chalk4.underline("3. Claude Code"));
+    console.log("   Run: transactional mcp install --target claude-code\n");
+    console.log(chalk4.bold("Available Commands:"));
+    console.log("  transactional mcp install    Install MCP config");
+    console.log("  transactional mcp uninstall  Remove MCP config");
+    console.log("  transactional mcp status     Check MCP server status");
+    console.log("  transactional mcp tools      List available MCP tools\n");
+  });
+  mcpCmd.command("config").description("Show MCP server configuration").option("--target <target>", "Target: claude-desktop, claude-code", "claude-desktop").option("--json", "Output as raw JSON").action((options) => {
+    const mcpUrl = getMcpServerUrl();
+    const target = options.target;
+    let config;
+    if (target === "claude-code") {
+      config = {
+        mcpServers: {
+          transactional: {
+            url: mcpUrl
+          }
+        }
+      };
+    } else {
+      config = {
+        mcpServers: {
+          transactional: {
+            command: "npx",
+            args: ["mcp-remote", mcpUrl.replace("/mcp", "")]
+          }
+        }
+      };
+    }
+    if (options.json) {
+      console.log(JSON.stringify(config, null, 2));
+    } else {
+      console.log("\n\u{1F4CB} MCP Configuration\n");
+      console.log(`Target: ${target}
+`);
+      console.log("```json");
+      console.log(JSON.stringify(config, null, 2));
+      console.log("```\n");
+      if (target === "claude-desktop") {
+        const configPath = getClaudeDesktopConfigPath();
+        console.log(`Config file: ${configPath}
+`);
+        console.log(chalk4.yellow("Note: Uses mcp-remote for OAuth support."));
+        console.log("Install mcp-remote: npm install -g mcp-remote\n");
+      } else {
+        const configPath = getClaudeCodeConfigPath();
+        console.log(`Config file: ${configPath}
+`);
+      }
+      console.log('Run "transactional mcp install" to auto-install.\n');
+    }
+  });
+  mcpCmd.command("install").description("Install MCP config to Claude Desktop or Claude Code").option("--target <target>", "Target: claude-desktop, claude-code, both", "both").option("--force", "Overwrite existing transactional config").action(async (options) => {
+    const target = options.target;
+    const mcpUrl = getMcpServerUrl();
+    const targets = target === "both" ? ["claude-desktop", "claude-code"] : [target];
+    let anyInstalled = false;
+    for (const t of targets) {
+      const spinner = ora2(`Installing MCP config for ${t}...`).start();
+      try {
+        if (t === "claude-desktop") {
+          const configPath = getClaudeDesktopConfigPath();
+          const existingConfig = readJsonConfig(configPath) || { mcpServers: {} };
+          if (existingConfig.mcpServers?.transactional && !options.force) {
+            spinner.warn(`Transactional already configured in Claude Desktop. Use --force to overwrite.`);
+            continue;
+          }
+          existingConfig.mcpServers = {
+            ...existingConfig.mcpServers,
+            transactional: {
+              command: "npx",
+              args: ["mcp-remote", mcpUrl.replace("/mcp", "")]
+            }
+          };
+          writeJsonConfig(configPath, existingConfig);
+          spinner.succeed(`Claude Desktop config installed: ${configPath}`);
+          anyInstalled = true;
+        } else if (t === "claude-code") {
+          const configPath = getClaudeCodeConfigPath();
+          const existingConfig = readJsonConfig(configPath) || {};
+          if (existingConfig.mcpServers?.transactional && !options.force) {
+            spinner.warn(`Transactional already configured in Claude Code. Use --force to overwrite.`);
+            continue;
+          }
+          existingConfig.mcpServers = {
+            ...existingConfig.mcpServers,
+            transactional: {
+              url: mcpUrl
+            }
+          };
+          writeJsonConfig(configPath, existingConfig);
+          spinner.succeed(`Claude Code config installed: ${configPath}`);
+          anyInstalled = true;
+        }
+      } catch (err) {
+        spinner.fail(`Failed to install ${t} config`);
+        printError(err instanceof Error ? err.message : "Unknown error");
+      }
+    }
+    if (anyInstalled) {
+      console.log("");
+      printWarning("Please restart Claude Desktop/Code to apply changes.");
+      console.log("");
+      console.log("When you first use Transactional tools, Claude will prompt you");
+      console.log("to authorize access to your Transactional account.\n");
+    }
+  });
+  mcpCmd.command("uninstall").description("Remove MCP config from Claude Desktop and/or Claude Code").option("--target <target>", "Target: claude-desktop, claude-code, both", "both").action((options) => {
+    const target = options.target;
+    const targets = target === "both" ? ["claude-desktop", "claude-code"] : [target];
+    for (const t of targets) {
+      const spinner = ora2(`Removing MCP config from ${t}...`).start();
+      try {
+        const configPath = t === "claude-desktop" ? getClaudeDesktopConfigPath() : getClaudeCodeConfigPath();
+        if (!fs.existsSync(configPath)) {
+          spinner.info(`No ${t} config found.`);
+          continue;
+        }
+        const config = readJsonConfig(configPath);
+        if (!config?.mcpServers?.transactional) {
+          spinner.info(`Transactional not configured in ${t}.`);
+          continue;
+        }
+        delete config.mcpServers.transactional;
+        writeJsonConfig(configPath, config);
+        spinner.succeed(`Removed from ${t}`);
+      } catch (err) {
+        spinner.fail(`Failed to remove ${t} config`);
+        printError(err instanceof Error ? err.message : "Unknown error");
+      }
+    }
+    console.log("");
+    printWarning("Please restart Claude Desktop/Code to apply changes.\n");
+  });
+  mcpCmd.command("status").description("Check MCP server status").action(async () => {
+    const spinner = ora2("Checking MCP server...").start();
+    const mcpUrl = getMcpServerUrl().replace("/mcp", "");
+    try {
+      const response = await fetch(`${mcpUrl}/health`);
+      if (response.ok) {
+        const data = await response.json();
+        spinner.succeed("MCP server is running");
+        console.log("\nServer info:");
+        print(data);
+        console.log("\nOAuth endpoints:");
+        console.log(`  Authorization: ${mcpUrl}/mcp/authorize`);
+        console.log(`  Token: ${mcpUrl}/mcp/token`);
+        console.log(`  Protected Resource Metadata: ${mcpUrl}/.well-known/oauth-protected-resource`);
+      } else {
+        spinner.fail(`MCP server returned ${response.status}`);
+      }
+    } catch (err) {
+      spinner.fail("Could not connect to MCP server");
+      printError(err instanceof Error ? err.message : "Unknown error");
+    }
+  });
+  mcpCmd.command("tools").description("List available MCP tools").action(() => {
+    console.log("\n\u{1F527} Available MCP Tools\n");
+    const tools = [
+      { category: "Email", tools: [
+        { name: "transactional_email_send", desc: "Send a single email" },
+        { name: "transactional_email_batch", desc: "Send multiple emails" },
+        { name: "transactional_email_stats", desc: "Get email statistics" },
+        { name: "transactional_templates_list", desc: "List templates" },
+        { name: "transactional_templates_get", desc: "Get template details" },
+        { name: "transactional_templates_create", desc: "Create template" },
+        { name: "transactional_domains_list", desc: "List domains" },
+        { name: "transactional_domains_add", desc: "Add domain" },
+        { name: "transactional_senders_list", desc: "List senders" },
+        { name: "transactional_suppressions_list", desc: "List suppressions" }
+      ] },
+      { category: "Organization", tools: [
+        { name: "transactional_whoami", desc: "Current user info" },
+        { name: "transactional_orgs_list", desc: "List organizations" },
+        { name: "transactional_orgs_switch", desc: "Switch organization" },
+        { name: "transactional_api_keys_list", desc: "List API keys" },
+        { name: "transactional_api_keys_create", desc: "Create API key" },
+        { name: "transactional_members_list", desc: "List members" }
+      ] },
+      { category: "Billing", tools: [
+        { name: "transactional_billing_usage", desc: "Get usage" },
+        { name: "transactional_billing_invoices", desc: "List invoices" },
+        { name: "transactional_billing_plan", desc: "Get plan details" }
+      ] }
+    ];
+    for (const category of tools) {
+      console.log(`${category.category}:`);
+      for (const tool of category.tools) {
+        console.log(`  ${tool.name.padEnd(35)} ${tool.desc}`);
+      }
+      console.log();
+    }
+  });
+  return mcpCmd;
 }
 
 // src/index.ts
@@ -1283,6 +1543,7 @@ function createProgram() {
   program2.addCommand(createOrgsCommand());
   program2.addCommand(createEmailCommand());
   program2.addCommand(createConfigCommand());
+  program2.addCommand(createMcpCommand());
   return program2;
 }
 

@@ -14,6 +14,7 @@ import {
   createOrgsCommand,
   createEmailCommand,
   createConfigCommand,
+  createMcpCommand,
 } from './commands';
 
 // Initialize configuration on import
@@ -42,6 +43,9 @@ export function createProgram(): Command {
 
   // Config commands
   program.addCommand(createConfigCommand());
+
+  // MCP commands
+  program.addCommand(createMcpCommand());
 
   return program;
 }

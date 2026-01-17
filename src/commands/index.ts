@@ -15,3 +15,5 @@ export {
 export { createEmailCommand } from './email';
 
 export { createConfigCommand } from './config';
+
+export { createMcpCommand } from './mcp';
