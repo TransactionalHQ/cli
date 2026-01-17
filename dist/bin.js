@@ -1390,16 +1390,20 @@ function createMcpCommand() {
   mcpCmd.command("install").description("Install MCP config to Claude Desktop or Claude Code").option("--target <target>", "Target: claude-desktop, claude-code, both", "both").option("--force", "Overwrite existing transactional config").action(async (options) => {
     const target = options.target;
     const mcpUrl = getMcpServerUrl();
+    console.log("\n\u{1F4E1} Installing Transactional MCP configuration...\n");
     const targets = target === "both" ? ["claude-desktop", "claude-code"] : [target];
     let anyInstalled = false;
+    let anySkipped = false;
     for (const t of targets) {
-      const spinner = ora2(`Installing MCP config for ${t}...`).start();
       try {
         if (t === "claude-desktop") {
           const configPath = getClaudeDesktopConfigPath();
           const existingConfig = readJsonConfig(configPath) || { mcpServers: {} };
           if (existingConfig.mcpServers?.transactional && !options.force) {
-            spinner.warn(`Transactional already configured in Claude Desktop. Use --force to overwrite.`);
+            printWarning(`Claude Desktop: Already configured. Use --force to overwrite.`);
+            console.log(`  Config: ${configPath}
+`);
+            anySkipped = true;
             continue;
           }
           existingConfig.mcpServers = {
@@ -1410,13 +1414,18 @@ function createMcpCommand() {
             }
           };
           writeJsonConfig(configPath, existingConfig);
-          spinner.succeed(`Claude Desktop config installed: ${configPath}`);
+          printSuccess(`Claude Desktop: Config installed`);
+          console.log(`  Config: ${configPath}
+`);
           anyInstalled = true;
         } else if (t === "claude-code") {
           const configPath = getClaudeCodeConfigPath();
           const existingConfig = readJsonConfig(configPath) || {};
           if (existingConfig.mcpServers?.transactional && !options.force) {
-            spinner.warn(`Transactional already configured in Claude Code. Use --force to overwrite.`);
+            printWarning(`Claude Code: Already configured. Use --force to overwrite.`);
+            console.log(`  Config: ${configPath}
+`);
+            anySkipped = true;
             continue;
           }
           existingConfig.mcpServers = {
@@ -1426,20 +1435,22 @@ function createMcpCommand() {
             }
           };
           writeJsonConfig(configPath, existingConfig);
-          spinner.succeed(`Claude Code config installed: ${configPath}`);
+          printSuccess(`Claude Code: Config installed`);
+          console.log(`  Config: ${configPath}
+`);
           anyInstalled = true;
         }
       } catch (err) {
-        spinner.fail(`Failed to install ${t} config`);
-        printError(err instanceof Error ? err.message : "Unknown error");
+        printError(`Failed to install ${t} config: ${err instanceof Error ? err.message : "Unknown error"}`);
       }
     }
     if (anyInstalled) {
+      console.log(chalk4.bold("Next steps:"));
+      console.log("1. Restart Claude Desktop/Code to apply changes");
+      console.log("2. When you use a Transactional tool, Claude will prompt you to authorize");
       console.log("");
-      printWarning("Please restart Claude Desktop/Code to apply changes.");
-      console.log("");
-      console.log("When you first use Transactional tools, Claude will prompt you");
-      console.log("to authorize access to your Transactional account.\n");
+    } else if (anySkipped) {
+      console.log("To force reinstall, run: transactional mcp install --force\n");
     }
   });
   mcpCmd.command("uninstall").description("Remove MCP config from Claude Desktop and/or Claude Code").option("--target <target>", "Target: claude-desktop, claude-code, both", "both").action((options) => {
