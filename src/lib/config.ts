@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import type { CliConfig, OutputFormat, StoredCredentials, OrganizationInfo } from './types';
+import type { CliConfig, OutputFormat, StoredCredentials } from './types';
 
 // =============================================================================
 // CONSTANTS
@@ -142,17 +142,28 @@ export function loadCredentials(): StoredCredentials {
   if (fs.existsSync(CREDENTIALS_FILE)) {
     try {
       const content = fs.readFileSync(CREDENTIALS_FILE, 'utf-8');
-      currentCredentials = JSON.parse(content) as StoredCredentials;
+      const loaded = JSON.parse(content) as StoredCredentials;
+
+      // Migrate from version 1 (per-org tokens) to version 2 (user token)
+      if (loaded.version === 1) {
+        // Clear old per-org tokens - user needs to re-login
+        currentCredentials = {
+          version: 2,
+          user: loaded.user,
+          currentOrganization: loaded.currentOrganization,
+        };
+        saveCredentials(currentCredentials);
+      } else {
+        currentCredentials = loaded;
+      }
     } catch {
       currentCredentials = {
-        version: 1,
-        organizations: {},
+        version: 2,
       };
     }
   } else {
     currentCredentials = {
-      version: 1,
-      organizations: {},
+      version: 2,
     };
   }
 
@@ -188,63 +199,39 @@ export function setCurrentOrganization(orgSlug: string): void {
 }
 
 /**
- * Get token for an organization
+ * Get the stored user token
  */
-export function getOrganizationToken(orgSlug?: string): string | undefined {
+export function getToken(): string | undefined {
   const credentials = loadCredentials();
-  const slug = orgSlug || credentials.currentOrganization;
-  if (!slug) return undefined;
 
-  const orgCreds = credentials.organizations[slug];
-  if (!orgCreds) return undefined;
-
-  // Check if token is expired
-  if (orgCreds.expiresAt && new Date(orgCreds.expiresAt) < new Date()) {
+  // Check if token exists
+  if (!credentials.token) {
     return undefined;
   }
 
-  return orgCreds.token;
-}
-
-/**
- * Store token for an organization
- */
-export function storeOrganizationToken(
-  orgSlug: string,
-  token: string,
-  expiresAt?: string
-): void {
-  const credentials = loadCredentials();
-  credentials.organizations[orgSlug] = { token, expiresAt };
-  saveCredentials(credentials);
-}
-
-/**
- * Remove token for an organization
- */
-export function removeOrganizationToken(orgSlug: string): void {
-  const credentials = loadCredentials();
-  delete credentials.organizations[orgSlug];
-  if (credentials.currentOrganization === orgSlug) {
-    credentials.currentOrganization = undefined;
+  // Check if token is expired
+  if (credentials.expiresAt && new Date(credentials.expiresAt) < new Date()) {
+    return undefined;
   }
+
+  return credentials.token;
+}
+
+/**
+ * Store the user token
+ */
+export function storeToken(token: string, expiresInSeconds: number): void {
+  const credentials = loadCredentials();
+  credentials.token = token;
+  credentials.expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
   saveCredentials(credentials);
 }
 
 /**
- * Get all authenticated organizations
- */
-export function getAuthenticatedOrganizations(): string[] {
-  const credentials = loadCredentials();
-  return Object.keys(credentials.organizations);
-}
-
-/**
- * Check if user is logged in to any organization
+ * Check if user is logged in
  */
 export function isLoggedIn(): boolean {
-  const credentials = loadCredentials();
-  return Object.keys(credentials.organizations).length > 0;
+  return !!getToken();
 }
 
 /**
@@ -253,8 +240,7 @@ export function isLoggedIn(): boolean {
 export function clearCredentials(): void {
   ensureConfigDir();
   currentCredentials = {
-    version: 1,
-    organizations: {},
+    version: 2,
   };
   if (fs.existsSync(CREDENTIALS_FILE)) {
     fs.unlinkSync(CREDENTIALS_FILE);
@@ -279,16 +265,10 @@ export function getUserInfo(): { id: string; email: string; name?: string } | un
 }
 
 /**
- * Switch to a different organization
+ * Switch to a different organization (just updates local selection)
  */
-export function switchOrganization(orgSlug: string): boolean {
-  const credentials = loadCredentials();
-  if (credentials.organizations[orgSlug]) {
-    credentials.currentOrganization = orgSlug;
-    saveCredentials(credentials);
-    return true;
-  }
-  return false;
+export function switchOrganization(orgSlug: string): void {
+  setCurrentOrganization(orgSlug);
 }
 
 /**

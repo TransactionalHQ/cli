@@ -71,14 +71,6 @@ export interface CommandResult<T> {
 // =============================================================================
 
 /**
- * Stored organization credentials
- */
-export interface OrganizationCredentials {
-  token: string;
-  expiresAt?: string;
-}
-
-/**
  * User information stored in credentials
  */
 export interface UserInfo {
@@ -88,7 +80,7 @@ export interface UserInfo {
 }
 
 /**
- * Organization info stored in credentials
+ * Organization info from API
  */
 export interface OrganizationInfo {
   id: number;
@@ -99,12 +91,14 @@ export interface OrganizationInfo {
 
 /**
  * Stored credentials file structure
+ * Version 2: User-scoped token (not per-org)
  */
 export interface StoredCredentials {
   version: number;
+  token?: string;
+  expiresAt?: string;
   user?: UserInfo;
-  organizations: Record<string, OrganizationCredentials>;
-  currentOrganization?: string;
+  currentOrganization?: string; // Selected org slug for CLI commands
 }
 
 // =============================================================================

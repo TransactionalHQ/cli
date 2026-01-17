@@ -5,7 +5,7 @@
  * Uses native fetch and requires no external dependencies.
  */
 
-import { getApiUrl, getOrganizationToken, getCurrentOrganization } from './config';
+import { getApiUrl, getToken, getCurrentOrganization } from './config';
 import type { CommandResult, ApiErrorResponse } from './types';
 
 // =============================================================================
@@ -18,10 +18,12 @@ import type { CommandResult, ApiErrorResponse } from './types';
 export class ApiClient {
   private baseUrl: string;
   private token: string | undefined;
+  private orgSlug: string | undefined;
 
   constructor(orgSlug?: string) {
     this.baseUrl = getApiUrl();
-    this.token = getOrganizationToken(orgSlug);
+    this.token = getToken();
+    this.orgSlug = orgSlug || getCurrentOrganization();
   }
 
   /**
@@ -35,6 +37,11 @@ export class ApiClient {
 
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    // Include organization context in headers
+    if (this.orgSlug) {
+      headers['X-Organization-Slug'] = this.orgSlug;
     }
 
     return headers;
@@ -193,6 +200,6 @@ export function getApiClient(orgSlug?: string): ApiClient {
 /**
  * Check if the user is authenticated for API calls
  */
-export function isAuthenticated(orgSlug?: string): boolean {
-  return !!getOrganizationToken(orgSlug || getCurrentOrganization());
+export function isAuthenticated(): boolean {
+  return !!getToken();
 }
