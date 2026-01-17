@@ -250,7 +250,12 @@ async function exchangeCodeForToken(
     );
   }
 
-  const data = await response.json();
+  const data = await response.json() as {
+    token: string;
+    expiresAt?: string;
+    user: { id: string; email: string; name?: string };
+    organization: { id: number; name: string; slug: string; role: string };
+  };
   return {
     token: data.token,
     expiresAt: data.expiresAt,

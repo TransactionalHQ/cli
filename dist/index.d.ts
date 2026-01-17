@@ -1,0 +1,664 @@
+import { Command } from 'commander';
+
+/**
+ * Self-contained types for the CLI
+ *
+ * This file contains all types needed by the CLI without any @transactional/* dependencies.
+ * This allows the CLI to be published as a standalone package.
+ */
+/**
+ * CLI session type
+ */
+declare enum CliSessionType {
+    CLI = "CLI",
+    MCP = "MCP"
+}
+/**
+ * Output format for CLI commands
+ */
+type OutputFormat = 'table' | 'json' | 'yaml';
+/**
+ * Standard API error response
+ */
+interface ApiErrorResponse {
+    error: {
+        code: string;
+        message: string;
+        details?: unknown;
+    };
+}
+/**
+ * Standard API success response
+ */
+interface ApiResponse<T> {
+    data: T;
+    meta?: {
+        page?: number;
+        limit?: number;
+        total?: number;
+    };
+}
+/**
+ * Generic command result with success/error handling
+ */
+interface CommandResult<T> {
+    success: boolean;
+    data?: T;
+    error?: {
+        code: string;
+        message: string;
+        details?: unknown;
+    };
+}
+/**
+ * Stored organization credentials
+ */
+interface OrganizationCredentials {
+    token: string;
+    expiresAt?: string;
+}
+/**
+ * User information stored in credentials
+ */
+interface UserInfo {
+    id: string;
+    email: string;
+    name?: string;
+}
+/**
+ * Organization info stored in credentials
+ */
+interface OrganizationInfo {
+    id: number;
+    name: string;
+    slug: string;
+    role: string;
+}
+/**
+ * Stored credentials file structure
+ */
+interface StoredCredentials {
+    version: number;
+    user?: UserInfo;
+    organizations: Record<string, OrganizationCredentials>;
+    currentOrganization?: string;
+}
+/**
+ * CLI configuration
+ */
+interface CliConfig {
+    apiUrl: string;
+    webUrl: string;
+    outputFormat: OutputFormat;
+    color: boolean;
+}
+/**
+ * Email send options
+ */
+interface EmailSendOptions {
+    from: string;
+    to: string;
+    subject?: string;
+    htmlBody?: string;
+    textBody?: string;
+    templateId?: number;
+    templateAlias?: string;
+    templateModel?: Record<string, unknown>;
+    cc?: string[];
+    bcc?: string[];
+    replyTo?: string;
+    tag?: string;
+    streamId?: number;
+}
+/**
+ * Email send result
+ */
+interface EmailSendResult {
+    messageId: string;
+    to: string;
+    submittedAt: string;
+    status?: string;
+}
+/**
+ * Email template
+ */
+interface EmailTemplate {
+    id: number;
+    name: string;
+    alias?: string;
+    subject: string;
+    htmlBody?: string;
+    textBody?: string;
+    status: string;
+    serverId: number;
+    createdAt: string;
+    updatedAt: string;
+}
+/**
+ * Email server
+ */
+interface EmailServer {
+    id: number;
+    name: string;
+    organizationId: number;
+    createdAt: string;
+    updatedAt: string;
+}
+/**
+ * Email stream
+ */
+interface EmailStream {
+    id: number;
+    name: string;
+    type: string;
+    serverId: number;
+    createdAt: string;
+    updatedAt: string;
+}
+/**
+ * Email domain
+ */
+interface EmailDomain {
+    id: number;
+    domain: string;
+    status: string;
+    verifiedAt?: string;
+    dnsRecords: Array<{
+        type: string;
+        name: string;
+        value: string;
+        verified?: boolean;
+    }>;
+    createdAt: string;
+}
+/**
+ * Email sender
+ */
+interface EmailSender {
+    id: number;
+    email: string;
+    name?: string;
+    status: string;
+    verifiedAt?: string;
+    createdAt: string;
+}
+/**
+ * Email suppression
+ */
+interface EmailSuppression {
+    email: string;
+    reason: string;
+    createdAt: string;
+}
+/**
+ * Email statistics
+ */
+interface EmailStats {
+    period: string;
+    sent: number;
+    delivered: number;
+    bounced: number;
+    complained: number;
+    opened: number;
+    clicked: number;
+    deliveryRate: number;
+    openRate: number;
+    clickRate: number;
+    bounceRate: number;
+    complaintRate: number;
+}
+/**
+ * Organization member
+ */
+interface OrgMember {
+    id: string;
+    email: string;
+    name?: string;
+    role: string;
+    joinedAt: string;
+}
+/**
+ * API key info
+ */
+interface ApiKeyInfo {
+    id: string;
+    name: string;
+    prefix: string;
+    scopes?: string[];
+    isLive: boolean;
+    lastUsedAt?: string;
+    expiresAt?: string;
+    createdAt: string;
+}
+/**
+ * Create API key result
+ */
+interface CreateApiKeyResult {
+    id: string;
+    name: string;
+    key: string;
+    prefix: string;
+    scopes?: string[];
+    isLive: boolean;
+    createdAt: string;
+}
+/**
+ * Billing usage info
+ */
+interface BillingUsage {
+    period: {
+        start: string;
+        end: string;
+    };
+    email: {
+        sent: number;
+        limit: number;
+        percentUsed: number;
+    };
+    sms?: {
+        sent: number;
+        limit: number;
+        percentUsed: number;
+    };
+}
+/**
+ * Invoice info
+ */
+interface Invoice {
+    id: string;
+    number: string;
+    amount: number;
+    currency: string;
+    status: string;
+    paidAt?: string;
+    dueAt?: string;
+    createdAt: string;
+    pdfUrl?: string;
+}
+/**
+ * Plan info
+ */
+interface PlanInfo {
+    id: string;
+    name: string;
+    emailQuota: number;
+    smsQuota?: number;
+    price: number;
+    currency: string;
+    interval: string;
+    features: string[];
+}
+/**
+ * Whoami response from API
+ */
+interface WhoamiResponse {
+    user: {
+        id: string;
+        email: string;
+        name?: string;
+    };
+    organization: {
+        id: number;
+        name: string;
+        slug: string;
+        role: string;
+    };
+    session: {
+        id: number;
+        type: string;
+        createdAt: string;
+        expiresAt?: string;
+    };
+}
+
+/**
+ * CLI Configuration
+ *
+ * Manages CLI configuration settings including API URLs and output preferences.
+ */
+
+/**
+ * Load configuration from file
+ */
+declare function loadConfig(): CliConfig;
+/**
+ * Save configuration to file
+ */
+declare function saveConfig(config: Partial<CliConfig>): void;
+/**
+ * Get the current configuration
+ */
+declare function getConfig(): CliConfig;
+/**
+ * Get the API URL
+ */
+declare function getApiUrl(): string;
+/**
+ * Get the Web URL
+ */
+declare function getWebUrl(): string;
+/**
+ * Get the output format
+ */
+declare function getOutputFormat(): OutputFormat;
+/**
+ * Check if color output is enabled
+ */
+declare function isColorEnabled(): boolean;
+/**
+ * Load credentials from file
+ */
+declare function loadCredentials(): StoredCredentials;
+/**
+ * Save credentials to file
+ */
+declare function saveCredentials(credentials: StoredCredentials): void;
+/**
+ * Get the current organization slug
+ */
+declare function getCurrentOrganization(): string | undefined;
+/**
+ * Set the current organization
+ */
+declare function setCurrentOrganization(orgSlug: string): void;
+/**
+ * Get token for an organization
+ */
+declare function getOrganizationToken(orgSlug?: string): string | undefined;
+/**
+ * Store token for an organization
+ */
+declare function storeOrganizationToken(orgSlug: string, token: string, expiresAt?: string): void;
+/**
+ * Remove token for an organization
+ */
+declare function removeOrganizationToken(orgSlug: string): void;
+/**
+ * Get all authenticated organizations
+ */
+declare function getAuthenticatedOrganizations(): string[];
+/**
+ * Check if user is logged in to any organization
+ */
+declare function isLoggedIn(): boolean;
+/**
+ * Clear all credentials (logout)
+ */
+declare function clearCredentials(): void;
+/**
+ * Store user info
+ */
+declare function storeUserInfo(user: {
+    id: string;
+    email: string;
+    name?: string;
+}): void;
+/**
+ * Get stored user info
+ */
+declare function getUserInfo(): {
+    id: string;
+    email: string;
+    name?: string;
+} | undefined;
+/**
+ * Switch to a different organization
+ */
+declare function switchOrganization(orgSlug: string): boolean;
+/**
+ * Get config directory path
+ */
+declare function getConfigDir(): string;
+/**
+ * Get credentials file path
+ */
+declare function getCredentialsFile(): string;
+/**
+ * Initialize config (call on CLI start)
+ */
+declare function initConfig(): CliConfig;
+
+/**
+ * HTTP API Client
+ *
+ * Self-contained HTTP client for making API requests.
+ * Uses native fetch and requires no external dependencies.
+ */
+
+/**
+ * HTTP API client for making authenticated requests
+ */
+declare class ApiClient {
+    private baseUrl;
+    private token;
+    constructor(orgSlug?: string);
+    /**
+     * Get headers for API requests
+     */
+    private getHeaders;
+    /**
+     * Build URL with query parameters
+     */
+    private buildUrl;
+    /**
+     * Make an HTTP request
+     */
+    private request;
+    /**
+     * GET request
+     */
+    get<T>(path: string, params?: Record<string, unknown>): Promise<CommandResult<T>>;
+    /**
+     * POST request
+     */
+    post<T>(path: string, body?: unknown): Promise<CommandResult<T>>;
+    /**
+     * PUT request
+     */
+    put<T>(path: string, body?: unknown): Promise<CommandResult<T>>;
+    /**
+     * PATCH request
+     */
+    patch<T>(path: string, body?: unknown): Promise<CommandResult<T>>;
+    /**
+     * DELETE request
+     */
+    delete<T = void>(path: string): Promise<CommandResult<T>>;
+}
+/**
+ * Get an API client for the current or specified organization
+ */
+declare function getApiClient(orgSlug?: string): ApiClient;
+/**
+ * Check if the user is authenticated for API calls
+ */
+declare function isAuthenticated(orgSlug?: string): boolean;
+
+/**
+ * Authentication
+ *
+ * Handles OAuth2 device authorization flow for CLI login.
+ */
+
+/**
+ * Perform OAuth login flow
+ */
+declare function login(sessionType?: 'cli' | 'mcp', onBrowserOpen?: () => void): Promise<CommandResult<{
+    user: {
+        id: string;
+        email: string;
+        name?: string;
+    };
+    organization: OrganizationInfo;
+}>>;
+/**
+ * Logout from all organizations
+ */
+declare function logout(): void;
+/**
+ * Get current user and organization info (whoami)
+ */
+declare function whoami(orgSlug?: string): Promise<CommandResult<WhoamiResponse>>;
+/**
+ * List all organizations the user has access to
+ */
+declare function listOrganizations(): Promise<CommandResult<OrganizationInfo[]>>;
+
+/**
+ * Auth Commands
+ *
+ * Commands for authentication: login, logout, whoami, switch org.
+ */
+
+/**
+ * Create the login command
+ */
+declare function createLoginCommand(): Command;
+/**
+ * Create the logout command
+ */
+declare function createLogoutCommand(): Command;
+/**
+ * Create the whoami command
+ */
+declare function createWhoamiCommand(): Command;
+/**
+ * Create the switch command
+ */
+declare function createSwitchCommand(): Command;
+/**
+ * Create the orgs list command
+ */
+declare function createOrgsCommand(): Command;
+
+/**
+ * Email Commands
+ *
+ * Commands for email operations: send, batch, templates, domains, senders, suppressions, stats.
+ */
+
+/**
+ * Create the email command
+ */
+declare function createEmailCommand(): Command;
+
+/**
+ * Config Commands
+ *
+ * Commands for managing CLI configuration.
+ */
+
+/**
+ * Create the config command
+ */
+declare function createConfigCommand(): Command;
+
+/**
+ * CLI Output Formatting
+ *
+ * Functions for formatting and displaying CLI output.
+ */
+
+/**
+ * Format data based on the output format setting
+ */
+declare function formatOutput(data: unknown, format?: OutputFormat): string;
+/**
+ * Print success message
+ */
+declare function printSuccess(message: string): void;
+/**
+ * Print error message
+ */
+declare function printError(message: string, details?: string): void;
+/**
+ * Print warning message
+ */
+declare function printWarning(message: string): void;
+/**
+ * Print info message
+ */
+declare function printInfo(message: string): void;
+/**
+ * Print a heading
+ */
+declare function printHeading(title: string): void;
+/**
+ * Print a key-value pair
+ */
+declare function printKeyValue(key: string, value: unknown): void;
+/**
+ * Print data with automatic format detection
+ */
+declare function print(data: unknown, format?: OutputFormat): void;
+
+/**
+ * CLI Prompts
+ *
+ * Interactive prompts for CLI user input.
+ */
+
+/**
+ * Prompt user to select an organization
+ */
+declare function selectOrganization(organizations: OrganizationInfo[]): Promise<string>;
+/**
+ * Prompt for confirmation
+ */
+declare function confirm(message: string, defaultValue?: boolean): Promise<boolean>;
+/**
+ * Prompt for text input
+ */
+declare function input(message: string, options?: {
+    default?: string;
+    required?: boolean;
+    validate?: (value: string) => boolean | string;
+}): Promise<string>;
+/**
+ * Prompt for password/secret input
+ */
+declare function password(message: string, options?: {
+    required?: boolean;
+    validate?: (value: string) => boolean | string;
+}): Promise<string>;
+/**
+ * Prompt for selection from a list
+ */
+declare function select<T extends string>(message: string, choices: {
+    name: string;
+    value: T;
+}[]): Promise<T>;
+/**
+ * Prompt for multiple selection from a list
+ */
+declare function multiSelect<T extends string>(message: string, choices: {
+    name: string;
+    value: T;
+    checked?: boolean;
+}[]): Promise<T[]>;
+/**
+ * Prompt for email input
+ */
+declare function emailInput(message: string, options?: {
+    default?: string;
+    required?: boolean;
+}): Promise<string>;
+/**
+ * Prompt for editor input (opens editor for multiline content)
+ */
+declare function editor(message: string, options?: {
+    default?: string;
+}): Promise<string>;
+
+/**
+ * Transactional CLI
+ *
+ * Main CLI entry point with Commander.js setup.
+ */
+
+/**
+ * Create the CLI program
+ */
+declare function createProgram(): Command;
+
+export { ApiClient, type ApiErrorResponse, type ApiKeyInfo, type ApiResponse, type BillingUsage, type CliConfig, CliSessionType, type CommandResult, type CreateApiKeyResult, type EmailDomain, type EmailSendOptions, type EmailSendResult, type EmailSender, type EmailServer, type EmailStats, type EmailStream, type EmailSuppression, type EmailTemplate, type Invoice, type OrgMember, type OrganizationCredentials, type OrganizationInfo, type OutputFormat, type PlanInfo, type StoredCredentials, type UserInfo, type WhoamiResponse, clearCredentials, confirm, createConfigCommand, createEmailCommand, createLoginCommand, createLogoutCommand, createOrgsCommand, createProgram, createSwitchCommand, createWhoamiCommand, editor, emailInput, formatOutput, getApiClient, getApiUrl, getAuthenticatedOrganizations, getConfig, getConfigDir, getCredentialsFile, getCurrentOrganization, getOrganizationToken, getOutputFormat, getUserInfo, getWebUrl, initConfig, input, isAuthenticated, isColorEnabled, isLoggedIn, listOrganizations, loadConfig, loadCredentials, login, logout, multiSelect, password, print, printError, printHeading, printInfo, printKeyValue, printSuccess, printWarning, removeOrganizationToken, saveConfig, saveCredentials, select, selectOrganization, setCurrentOrganization, storeOrganizationToken, storeUserInfo, switchOrganization, whoami };
