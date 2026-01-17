@@ -192,16 +192,36 @@ export interface EmailStream {
  */
 export interface EmailDomain {
   id: number;
-  domain: string;
+  name: string;
   status: string;
-  verifiedAt?: string;
-  dnsRecords: Array<{
-    type: string;
-    name: string;
-    value: string;
-    verified?: boolean;
-  }>;
-  createdAt: string;
+  dkimVerified: boolean;
+  spfVerified: boolean;
+  returnPathVerified: boolean;
+  dmarcVerified: boolean;
+  createdAt?: string;
+  lastVerifiedAt?: string;
+  verificationError?: string | null;
+}
+
+/**
+ * DNS Record for domain verification
+ */
+export interface DnsRecord {
+  type: string;
+  recordType: string;
+  name: string;
+  value: string;
+  verified: boolean;
+}
+
+/**
+ * Domain create response
+ */
+export interface DomainCreateResponse extends EmailDomain {
+  dkimSelector: string;
+  dkimPublicKey: string;
+  dkimRecordValue: string;
+  dnsRecords: DnsRecord[];
 }
 
 /**
@@ -220,8 +240,12 @@ export interface EmailSender {
  * Email suppression
  */
 export interface EmailSuppression {
+  id: number;
   email: string;
   reason: string;
+  notes: string | null;
+  serverId: number | null;
+  streamId: number | null;
   createdAt: string;
 }
 
@@ -356,7 +380,7 @@ export interface WhoamiResponse {
     name: string;
     slug: string;
     role: string;
-  };
+  } | null;
   session: {
     id: number;
     type: string;

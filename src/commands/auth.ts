@@ -27,19 +27,20 @@ export function createLoginCommand(): Command {
   return new Command('login')
     .description('Authenticate with Transactional')
     .option('--mcp', 'Login for MCP server use')
+    .option('-f, --force', 'Force new login even if already logged in')
     .action(async (options) => {
-      if (isLoggedIn()) {
+      if (isLoggedIn() && !options.force) {
         const currentOrg = getCurrentOrganization();
         if (currentOrg) {
           printInfo(`Already logged in. Current organization: ${currentOrg}`);
         } else {
           printInfo('Already logged in. Use "transactional org use <slug>" to select an organization.');
         }
-        printInfo('Use "transactional logout" to log out first.');
+        printInfo('Use "transactional login --force" to get a new token.');
         return;
       }
 
-      let spinner: ReturnType<typeof ora> | null = null;
+      const spinner = ora();
 
       const result = await login(options.mcp ? 'MCP' : 'CLI', {
         onDeviceCode: (userCode, verificationUrl) => {
@@ -52,33 +53,31 @@ export function createLoginCommand(): Command {
           console.log();
         },
         onBrowserOpen: () => {
-          spinner = ora('Opening browser...').start();
+          spinner.start('Opening browser...');
           spinner.succeed('Browser opened');
-          spinner = ora('Waiting for authorization...').start();
+          spinner.start('Waiting for authorization...');
         },
         onPolling: () => {
           // Could add a dot or similar to show activity
         },
       });
 
-      if (spinner) {
-        if (!result.success || !result.data) {
-          spinner.fail('Login failed');
-          printError(result.error?.message || 'Unknown error');
-          process.exit(1);
-        }
-        spinner.succeed('Authorization received!');
+      if (!result.success || !result.data) {
+        spinner.fail('Login failed');
+        printError(result.error?.message || 'Unknown error');
+        process.exit(1);
       }
 
+      spinner.succeed('Authorization received!');
       console.log();
       printSuccess('Login successful!');
       console.log();
-      printKeyValue('User', result.data!.user.email);
+      printKeyValue('User', result.data.user.email);
 
       // Prompt to select an organization
-      if (result.data!.organizations.length > 0) {
+      if (result.data.organizations.length > 0) {
         console.log();
-        printInfo(`You have access to ${result.data!.organizations.length} organization(s).`);
+        printInfo(`You have access to ${result.data.organizations.length} organization(s).`);
         printInfo('Use "transactional org list" to see them, or "transactional org use <slug>" to select one.');
       }
     });
@@ -144,14 +143,18 @@ export function createWhoamiCommand(): Command {
 
         console.log();
         printHeading('Organization');
-        printKeyValue('ID', organization.id);
-        printKeyValue('Name', organization.name);
-        printKeyValue('Slug', organization.slug);
-        printKeyValue('Role', organization.role);
+        if (organization) {
+          printKeyValue('ID', String(organization.id));
+          printKeyValue('Name', organization.name);
+          printKeyValue('Slug', organization.slug);
+          printKeyValue('Role', organization.role);
+        } else {
+          printInfo('No organization selected. Use "transactional org use <slug>" to select one.');
+        }
 
         console.log();
         printHeading('Session');
-        printKeyValue('ID', session.id);
+        printKeyValue('ID', String(session.id));
         printKeyValue('Type', session.type);
         printKeyValue('Created', session.createdAt);
         if (session.expiresAt) printKeyValue('Expires', session.expiresAt);

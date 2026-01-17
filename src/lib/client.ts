@@ -14,14 +14,15 @@ import type { CommandResult, ApiErrorResponse } from './types';
 
 /**
  * HTTP API client for making authenticated requests
+ * All API requests go to the Hono API server (apiUrl)
  */
 export class ApiClient {
-  private baseUrl: string;
+  private apiUrl: string;
   private token: string | undefined;
   private orgSlug: string | undefined;
 
   constructor(orgSlug?: string) {
-    this.baseUrl = getApiUrl();
+    this.apiUrl = getApiUrl();
     this.token = getToken();
     this.orgSlug = orgSlug || getCurrentOrganization();
   }
@@ -51,7 +52,7 @@ export class ApiClient {
    * Build URL with query parameters
    */
   private buildUrl(path: string, params?: Record<string, unknown>): string {
-    const url = new URL(path, this.baseUrl);
+    const url = new URL(path, this.apiUrl);
 
     if (params) {
       for (const [key, value] of Object.entries(params)) {
@@ -130,7 +131,7 @@ export class ApiClient {
             success: false,
             error: {
               code: 'CONNECTION_REFUSED',
-              message: `Cannot connect to API server at ${this.baseUrl}. Check your network connection.`,
+              message: `Cannot connect to API server. Check your network connection.`,
             },
           };
         }

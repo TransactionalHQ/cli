@@ -3,8 +3,6 @@ import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import * as http from 'http';
-import * as crypto from 'crypto';
 import open from 'open';
 import ora2 from 'ora';
 import chalk from 'chalk';
@@ -83,17 +81,25 @@ function loadCredentials() {
   if (fs.existsSync(CREDENTIALS_FILE)) {
     try {
       const content = fs.readFileSync(CREDENTIALS_FILE, "utf-8");
-      currentCredentials = JSON.parse(content);
+      const loaded = JSON.parse(content);
+      if (loaded.version === 1) {
+        currentCredentials = {
+          version: 2,
+          user: loaded.user,
+          currentOrganization: loaded.currentOrganization
+        };
+        saveCredentials(currentCredentials);
+      } else {
+        currentCredentials = loaded;
+      }
     } catch {
       currentCredentials = {
-        version: 1,
-        organizations: {}
+        version: 2
       };
     }
   } else {
     currentCredentials = {
-      version: 1,
-      organizations: {}
+      version: 2
     };
   }
   return currentCredentials;
@@ -114,35 +120,29 @@ function setCurrentOrganization(orgSlug) {
   credentials.currentOrganization = orgSlug;
   saveCredentials(credentials);
 }
-function getOrganizationToken(orgSlug) {
+function getToken() {
   const credentials = loadCredentials();
-  const slug = orgSlug || credentials.currentOrganization;
-  if (!slug) return void 0;
-  const orgCreds = credentials.organizations[slug];
-  if (!orgCreds) return void 0;
-  if (orgCreds.expiresAt && new Date(orgCreds.expiresAt) < /* @__PURE__ */ new Date()) {
+  if (!credentials.token) {
     return void 0;
   }
-  return orgCreds.token;
+  if (credentials.expiresAt && new Date(credentials.expiresAt) < /* @__PURE__ */ new Date()) {
+    return void 0;
+  }
+  return credentials.token;
 }
-function storeOrganizationToken(orgSlug, token, expiresAt) {
+function storeToken(token, expiresInSeconds) {
   const credentials = loadCredentials();
-  credentials.organizations[orgSlug] = { token, expiresAt };
+  credentials.token = token;
+  credentials.expiresAt = new Date(Date.now() + expiresInSeconds * 1e3).toISOString();
   saveCredentials(credentials);
 }
-function getAuthenticatedOrganizations() {
-  const credentials = loadCredentials();
-  return Object.keys(credentials.organizations);
-}
 function isLoggedIn() {
-  const credentials = loadCredentials();
-  return Object.keys(credentials.organizations).length > 0;
+  return !!getToken();
 }
 function clearCredentials() {
   ensureConfigDir();
   currentCredentials = {
-    version: 1,
-    organizations: {}
+    version: 2
   };
   if (fs.existsSync(CREDENTIALS_FILE)) {
     fs.unlinkSync(CREDENTIALS_FILE);
@@ -154,13 +154,7 @@ function storeUserInfo(user) {
   saveCredentials(credentials);
 }
 function switchOrganization(orgSlug) {
-  const credentials = loadCredentials();
-  if (credentials.organizations[orgSlug]) {
-    credentials.currentOrganization = orgSlug;
-    saveCredentials(credentials);
-    return true;
-  }
-  return false;
+  setCurrentOrganization(orgSlug);
 }
 function getConfigDir() {
   return CONFIG_DIR;
@@ -174,11 +168,13 @@ function initConfig() {
 
 // src/lib/client.ts
 var ApiClient = class {
-  baseUrl;
+  apiUrl;
   token;
+  orgSlug;
   constructor(orgSlug) {
-    this.baseUrl = getApiUrl();
-    this.token = getOrganizationToken(orgSlug);
+    this.apiUrl = getApiUrl();
+    this.token = getToken();
+    this.orgSlug = orgSlug || getCurrentOrganization();
   }
   /**
    * Get headers for API requests
@@ -191,13 +187,16 @@ var ApiClient = class {
     if (this.token) {
       headers["Authorization"] = `Bearer ${this.token}`;
     }
+    if (this.orgSlug) {
+      headers["X-Organization-Slug"] = this.orgSlug;
+    }
     return headers;
   }
   /**
    * Build URL with query parameters
    */
   buildUrl(path2, params) {
-    const url = new URL(path2, this.baseUrl);
+    const url = new URL(path2, this.apiUrl);
     if (params) {
       for (const [key, value] of Object.entries(params)) {
         if (value !== void 0 && value !== null) {
@@ -253,7 +252,7 @@ var ApiClient = class {
             success: false,
             error: {
               code: "CONNECTION_REFUSED",
-              message: `Cannot connect to API server at ${this.baseUrl}. Check your network connection.`
+              message: `Cannot connect to API server. Check your network connection.`
             }
           };
         }
@@ -308,234 +307,97 @@ var ApiClient = class {
 function getApiClient(orgSlug) {
   return new ApiClient(orgSlug);
 }
-var CALLBACK_PORT_RANGE = [3e3, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009, 3010];
-function generateState() {
-  return crypto.randomBytes(32).toString("base64url");
-}
-function generateCodeVerifier() {
-  return crypto.randomBytes(32).toString("base64url");
-}
-function generateCodeChallenge(verifier) {
-  return crypto.createHash("sha256").update(verifier).digest("base64url");
-}
-function startCallbackServer(state, codeVerifier, sessionType = "cli") {
-  return new Promise((resolve, reject) => {
-    let server = null;
-    const tryPort = (portIndex) => {
-      if (portIndex >= CALLBACK_PORT_RANGE.length) {
-        reject(new Error("Could not find available port for callback server"));
-        return;
-      }
-      const port = CALLBACK_PORT_RANGE[portIndex];
-      server = http.createServer((req, res) => {
-        const url = new URL(req.url || "/", `http://localhost:${port}`);
-        if (url.pathname === "/callback") {
-          const code = url.searchParams.get("code");
-          const returnedState = url.searchParams.get("state");
-          const orgSlug = url.searchParams.get("org");
-          const error = url.searchParams.get("error");
-          const errorDescription = url.searchParams.get("error_description");
-          res.setHeader("Access-Control-Allow-Origin", "*");
-          res.setHeader("Content-Type", "text/html");
-          if (error) {
-            res.writeHead(400);
-            res.end(`
-              <!DOCTYPE html>
-              <html>
-                <head>
-                  <title>Login Failed</title>
-                  <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 100px auto; text-align: center; }
-                    h1 { color: #ef4444; }
-                  </style>
-                </head>
-                <body>
-                  <h1>Login Failed</h1>
-                  <p>${errorDescription || error}</p>
-                  <p>You can close this window and try again.</p>
-                </body>
-              </html>
-            `);
-            server?.close();
-            reject(new Error(errorDescription || error));
-            return;
-          }
-          if (!code || !returnedState || !orgSlug) {
-            res.writeHead(400);
-            res.end(`
-              <!DOCTYPE html>
-              <html>
-                <head>
-                  <title>Login Failed</title>
-                  <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 100px auto; text-align: center; }
-                    h1 { color: #ef4444; }
-                  </style>
-                </head>
-                <body>
-                  <h1>Login Failed</h1>
-                  <p>Missing required parameters in callback.</p>
-                  <p>You can close this window and try again.</p>
-                </body>
-              </html>
-            `);
-            server?.close();
-            reject(new Error("Missing required parameters in callback"));
-            return;
-          }
-          if (returnedState !== state) {
-            res.writeHead(400);
-            res.end(`
-              <!DOCTYPE html>
-              <html>
-                <head>
-                  <title>Login Failed</title>
-                  <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 100px auto; text-align: center; }
-                    h1 { color: #ef4444; }
-                  </style>
-                </head>
-                <body>
-                  <h1>Login Failed</h1>
-                  <p>Invalid state parameter. This may indicate a security issue.</p>
-                  <p>You can close this window and try again.</p>
-                </body>
-              </html>
-            `);
-            server?.close();
-            reject(new Error("Invalid state parameter"));
-            return;
-          }
-          res.writeHead(200);
-          res.end(`
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <title>Login Successful</title>
-                <style>
-                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 100px auto; text-align: center; }
-                  h1 { color: #22c55e; }
-                </style>
-              </head>
-              <body>
-                <h1>Login Successful!</h1>
-                <p>You have been authenticated with <strong>${orgSlug}</strong>.</p>
-                <p>You can close this window and return to the terminal.</p>
-              </body>
-            </html>
-          `);
-          server?.close();
-          resolve({ code, orgSlug, port });
-        } else {
-          res.writeHead(404);
-          res.end("Not found");
-        }
-      });
-      server.on("error", (err) => {
-        if (err.code === "EADDRINUSE") {
-          tryPort(portIndex + 1);
-        } else {
-          reject(err);
-        }
-      });
-      server.listen(port, "127.0.0.1", () => {
-      });
-    };
-    tryPort(0);
-    setTimeout(() => {
-      if (server?.listening) {
-        server.close();
-        reject(new Error("Login timed out. Please try again."));
-      }
-    }, 5 * 60 * 1e3);
-  });
-}
-async function exchangeCodeForToken(code, codeVerifier, redirectUri, sessionType = "cli") {
-  getApiUrl();
-  const webUrl = getWebUrl();
-  const response = await fetch(`${webUrl}/api/cli/token`, {
+async function requestDeviceCode(sessionType = "CLI") {
+  const apiUrl = getApiUrl();
+  const response = await fetch(`${apiUrl}/cli/device-code`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "User-Agent": "transactional-cli/0.1.0"
     },
     body: JSON.stringify({
-      code,
-      codeVerifier,
-      redirectUri,
-      sessionType: sessionType.toUpperCase()
+      sessionType,
+      clientInfo: {
+        deviceName: process.env.HOSTNAME || "Unknown",
+        osName: process.platform,
+        osVersion: process.version,
+        hostname: process.env.HOSTNAME || "Unknown",
+        clientVersion: "0.1.0"
+      }
     })
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.error || `Token exchange failed: ${response.statusText}`
-    );
+    const errorMsg = typeof errorData.error === "string" ? errorData.error : errorData.error?.message || "Failed to get device code";
+    throw new Error(errorMsg);
   }
-  const data = await response.json();
-  return {
-    token: data.token,
-    expiresAt: data.expiresAt,
-    user: data.user,
-    organization: data.organization
-  };
+  return response.json();
 }
-async function login(sessionType = "cli", onBrowserOpen) {
+async function pollForToken(deviceCode, interval, expiresIn, onPoll) {
+  const apiUrl = getApiUrl();
+  const startTime = Date.now();
+  const expiresAt = startTime + expiresIn * 1e3;
+  while (Date.now() < expiresAt) {
+    if (onPoll) onPoll();
+    const response = await fetch(`${apiUrl}/cli/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "transactional-cli/0.1.0"
+      },
+      body: JSON.stringify({ deviceCode })
+    });
+    if (response.ok) {
+      return response.json();
+    }
+    const errorData = await response.json();
+    switch (errorData.error) {
+      case "authorization_pending":
+        break;
+      case "slow_down":
+        interval = Math.min(interval + 5, 60);
+        break;
+      case "expired_token":
+        throw new Error("Login timed out. Please try again.");
+      case "access_denied":
+        throw new Error("Authorization denied.");
+      default:
+        throw new Error(errorData.error_description || "Login failed");
+    }
+    await new Promise((resolve) => setTimeout(resolve, interval * 1e3));
+  }
+  throw new Error("Login timed out. Please try again.");
+}
+async function login(sessionType = "CLI", callbacks) {
   try {
-    const state = generateState();
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
-    const callbackPromise = startCallbackServer(state, codeVerifier, sessionType);
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    let port = 3e3;
-    for (const p of CALLBACK_PORT_RANGE) {
-      try {
-        const server = http.createServer();
-        await new Promise((resolve, reject) => {
-          server.once("error", (err) => {
-            if (err.code === "EADDRINUSE") {
-              port = p;
-              resolve();
-            } else {
-              reject(err);
-            }
-          });
-          server.listen(p, "127.0.0.1", () => {
-            server.close();
-            resolve();
-          });
-        });
-        if (port === p) break;
-      } catch {
-      }
-    }
-    const redirectUri = `http://localhost:${port}/callback`;
+    const deviceCodeResponse = await requestDeviceCode(sessionType);
+    const { deviceCode, userCode, expiresIn, interval } = deviceCodeResponse;
     const webUrl = getWebUrl();
-    const authUrl = new URL("/cli/authorize", webUrl);
-    authUrl.searchParams.set("state", state);
-    authUrl.searchParams.set("code_challenge", codeChallenge);
-    authUrl.searchParams.set("code_challenge_method", "S256");
-    authUrl.searchParams.set("redirect_uri", redirectUri);
-    authUrl.searchParams.set("session_type", sessionType.toUpperCase());
-    if (onBrowserOpen) {
-      onBrowserOpen();
+    const verificationUrl = `${webUrl}/cli/authorize?user_code=${userCode}`;
+    if (callbacks?.onDeviceCode) {
+      callbacks.onDeviceCode(userCode, verificationUrl);
     }
-    await open(authUrl.toString());
-    const { code, orgSlug } = await callbackPromise;
-    const { token, expiresAt, user, organization } = await exchangeCodeForToken(
-      code,
-      codeVerifier,
-      redirectUri,
-      sessionType
+    if (callbacks?.onBrowserOpen) {
+      callbacks.onBrowserOpen();
+    }
+    await open(verificationUrl);
+    const tokenResponse = await pollForToken(
+      deviceCode,
+      interval,
+      expiresIn,
+      callbacks?.onPolling
     );
-    storeOrganizationToken(orgSlug, token, expiresAt);
-    storeUserInfo(user);
-    setCurrentOrganization(orgSlug);
+    storeToken(tokenResponse.token, tokenResponse.expiresIn);
+    storeUserInfo({
+      id: tokenResponse.user.id,
+      email: tokenResponse.user.email,
+      name: tokenResponse.user.name
+    });
     return {
       success: true,
       data: {
-        user,
-        organization
+        user: tokenResponse.user,
+        organizations: tokenResponse.organizations
       }
     };
   } catch (err) {
@@ -554,6 +416,10 @@ function logout() {
 async function whoami(orgSlug) {
   const client = getApiClient(orgSlug);
   return client.get("/cli/whoami");
+}
+async function listOrganizations() {
+  const client = getApiClient();
+  return client.get("/cli/organizations");
 }
 function formatOutput(data, format) {
   const outputFormat = format || getOutputFormat();
@@ -676,28 +542,58 @@ async function confirm(message, defaultValue = false) {
 
 // src/commands/auth.ts
 function createLoginCommand() {
-  return new Command("login").description("Authenticate with Transactional").option("--mcp", "Login for MCP server use").action(async (options) => {
-    if (isLoggedIn()) {
+  return new Command("login").description("Authenticate with Transactional").option("--mcp", "Login for MCP server use").option("-f, --force", "Force new login even if already logged in").action(async (options) => {
+    if (isLoggedIn() && !options.force) {
       const currentOrg = getCurrentOrganization();
-      printInfo(`Already logged in to organization: ${currentOrg}`);
-      printInfo('Use "transactional logout" to log out first, or "transactional switch" to change organization.');
+      if (currentOrg) {
+        printInfo(`Already logged in. Current organization: ${currentOrg}`);
+      } else {
+        printInfo('Already logged in. Use "transactional org use <slug>" to select an organization.');
+      }
+      printInfo('Use "transactional login --force" to get a new token.');
       return;
     }
-    const spinner = ora2("Opening browser for authentication...").start();
-    const result = await login(options.mcp ? "mcp" : "cli", () => {
-      spinner.text = "Waiting for browser authentication...";
+    const spinner = ora2();
+    const result = await login(options.mcp ? "MCP" : "CLI", {
+      onDeviceCode: (userCode, verificationUrl) => {
+        console.log();
+        console.log(chalk.bold("To complete authentication:"));
+        console.log();
+        console.log(`  1. Visit: ${chalk.cyan(verificationUrl)}`);
+        console.log(`  2. Verify this code matches: ${chalk.bold.yellow(formatUserCode(userCode))}`);
+        console.log(`  3. Click "Authorize" in your browser`);
+        console.log();
+      },
+      onBrowserOpen: () => {
+        spinner.start("Opening browser...");
+        spinner.succeed("Browser opened");
+        spinner.start("Waiting for authorization...");
+      },
+      onPolling: () => {
+      }
     });
     if (!result.success || !result.data) {
       spinner.fail("Login failed");
       printError(result.error?.message || "Unknown error");
       process.exit(1);
     }
-    spinner.succeed("Login successful!");
+    spinner.succeed("Authorization received!");
+    console.log();
+    printSuccess("Login successful!");
     console.log();
     printKeyValue("User", result.data.user.email);
-    printKeyValue("Organization", `${result.data.organization.name} (${result.data.organization.slug})`);
-    printKeyValue("Role", result.data.organization.role);
+    if (result.data.organizations.length > 0) {
+      console.log();
+      printInfo(`You have access to ${result.data.organizations.length} organization(s).`);
+      printInfo('Use "transactional org list" to see them, or "transactional org use <slug>" to select one.');
+    }
   });
+}
+function formatUserCode(code) {
+  if (code.length === 8) {
+    return `${code.slice(0, 4)}-${code.slice(4)}`;
+  }
+  return code;
 }
 function createLogoutCommand() {
   return new Command("logout").description("Log out from all organizations").action(async () => {
@@ -731,13 +627,17 @@ function createWhoamiCommand() {
       if (user.name) printKeyValue("Name", user.name);
       console.log();
       printHeading("Organization");
-      printKeyValue("ID", organization.id);
-      printKeyValue("Name", organization.name);
-      printKeyValue("Slug", organization.slug);
-      printKeyValue("Role", organization.role);
+      if (organization) {
+        printKeyValue("ID", String(organization.id));
+        printKeyValue("Name", organization.name);
+        printKeyValue("Slug", organization.slug);
+        printKeyValue("Role", organization.role);
+      } else {
+        printInfo('No organization selected. Use "transactional org use <slug>" to select one.');
+      }
       console.log();
       printHeading("Session");
-      printKeyValue("ID", session.id);
+      printKeyValue("ID", String(session.id));
       printKeyValue("Type", session.type);
       printKeyValue("Created", session.createdAt);
       if (session.expiresAt) printKeyValue("Expires", session.expiresAt);
@@ -745,93 +645,110 @@ function createWhoamiCommand() {
   });
 }
 function createSwitchCommand() {
-  return new Command("switch").description("Switch to a different organization").argument("[slug]", "Organization slug to switch to").action(async (slug) => {
+  return new Command("switch").description('Switch to a different organization (alias for "org use")').argument("[slug]", "Organization slug to switch to").action(async (slug) => {
     if (!isLoggedIn()) {
       printError('Not logged in. Use "transactional login" to authenticate.');
       process.exit(1);
     }
-    const orgs = getAuthenticatedOrganizations();
-    if (orgs.length === 0) {
-      printError("No authenticated organizations found.");
+    const spinner = ora2("Fetching organizations...").start();
+    const orgsResult = await listOrganizations();
+    if (!orgsResult.success || !orgsResult.data) {
+      spinner.fail("Failed to fetch organizations");
+      printError(orgsResult.error?.message || "Unknown error");
       process.exit(1);
     }
-    if (orgs.length === 1) {
-      printInfo(`Only one organization available: ${orgs[0]}`);
-      switchOrganization(orgs[0]);
-      return;
+    const orgs = orgsResult.data;
+    spinner.stop();
+    if (orgs.length === 0) {
+      printError("No organizations found.");
+      process.exit(1);
     }
     let targetSlug = slug;
     if (!targetSlug) {
-      const orgInfos = [];
-      for (const orgSlug of orgs) {
-        const result = await whoami(orgSlug);
-        if (result.success && result.data) {
-          orgInfos.push({
-            id: result.data.organization.id,
-            name: result.data.organization.name,
-            slug: result.data.organization.slug,
-            role: result.data.organization.role
-          });
-        } else {
-          orgInfos.push({
-            id: 0,
-            name: orgSlug,
-            slug: orgSlug,
-            role: "unknown"
-          });
-        }
+      if (orgs.length === 1) {
+        targetSlug = orgs[0].slug;
+        printInfo(`Only one organization available: ${targetSlug}`);
+      } else {
+        targetSlug = await selectOrganization(orgs);
       }
-      targetSlug = await selectOrganization(orgInfos);
     }
-    if (!orgs.includes(targetSlug)) {
-      printError(`Organization "${targetSlug}" is not authenticated.`);
-      printInfo("Available organizations: " + orgs.join(", "));
+    const validOrg = orgs.find((o) => o.slug === targetSlug);
+    if (!validOrg) {
+      printError(`Organization "${targetSlug}" not found.`);
+      printInfo("Available organizations: " + orgs.map((o) => o.slug).join(", "));
       process.exit(1);
     }
-    const success = switchOrganization(targetSlug);
-    if (success) {
-      printSuccess(`Switched to organization: ${targetSlug}`);
-    } else {
-      printError(`Failed to switch to organization: ${targetSlug}`);
-      process.exit(1);
-    }
+    switchOrganization(targetSlug);
+    printSuccess(`Switched to organization: ${validOrg.name} (${targetSlug})`);
   });
 }
 function createOrgsCommand() {
-  const orgsCmd = new Command("orgs").description("List organizations");
-  orgsCmd.command("list").description("List all authenticated organizations").option("--json", "Output as JSON").action(async (options) => {
-    const orgs = getAuthenticatedOrganizations();
+  const orgCmd = new Command("org").description("Manage organizations");
+  orgCmd.command("list").description("List all organizations you have access to").option("--json", "Output as JSON").action(async (options) => {
+    if (!isLoggedIn()) {
+      printError('Not logged in. Use "transactional login" to authenticate.');
+      process.exit(1);
+    }
+    const spinner = ora2("Fetching organizations...").start();
+    const result = await listOrganizations();
+    if (!result.success || !result.data) {
+      spinner.fail("Failed to fetch organizations");
+      printError(result.error?.message || "Unknown error");
+      process.exit(1);
+    }
+    spinner.stop();
+    const orgs = result.data;
+    const currentOrg = getCurrentOrganization();
     if (orgs.length === 0) {
-      printInfo('No authenticated organizations. Use "transactional login" to authenticate.');
+      printInfo("No organizations found.");
       return;
     }
-    const orgInfos = [];
-    const currentOrg = getCurrentOrganization();
-    for (const orgSlug of orgs) {
-      const result = await whoami(orgSlug);
-      if (result.success && result.data) {
-        orgInfos.push({
-          slug: result.data.organization.slug,
-          name: result.data.organization.name,
-          role: result.data.organization.role,
-          current: orgSlug === currentOrg ? "Yes" : "No"
-        });
-      } else {
-        orgInfos.push({
-          slug: orgSlug,
-          name: "-",
-          role: "-",
-          current: orgSlug === currentOrg ? "Yes" : "No"
-        });
-      }
-    }
+    const orgInfos = orgs.map((org) => ({
+      slug: org.slug,
+      name: org.name,
+      role: org.role,
+      current: org.slug === currentOrg ? "*" : ""
+    }));
     if (options.json) {
       print(orgInfos, "json");
     } else {
       print(orgInfos);
+      console.log();
+      printInfo(`Current organization: ${currentOrg || "(none selected)"}`);
     }
   });
-  return orgsCmd;
+  orgCmd.command("use").description("Set the current organization for CLI commands").argument("<slug>", "Organization slug to use").action(async (slug) => {
+    if (!isLoggedIn()) {
+      printError('Not logged in. Use "transactional login" to authenticate.');
+      process.exit(1);
+    }
+    const spinner = ora2("Verifying organization...").start();
+    const result = await listOrganizations();
+    if (!result.success || !result.data) {
+      spinner.fail("Failed to verify organization");
+      printError(result.error?.message || "Unknown error");
+      process.exit(1);
+    }
+    const org = result.data.find((o) => o.slug === slug);
+    if (!org) {
+      spinner.fail("Organization not found");
+      printError(`Organization "${slug}" not found.`);
+      printInfo('Use "transactional org list" to see available organizations.');
+      process.exit(1);
+    }
+    spinner.stop();
+    switchOrganization(slug);
+    printSuccess(`Now using organization: ${org.name} (${slug})`);
+  });
+  orgCmd.command("current").description("Show the current organization").action(() => {
+    const currentOrg = getCurrentOrganization();
+    if (currentOrg) {
+      printKeyValue("Current organization", currentOrg);
+    } else {
+      printInfo('No organization selected. Use "transactional org use <slug>" to select one.');
+    }
+  });
+  return orgCmd;
 }
 function printInfo(message) {
   if (isColorEnabled()) {
@@ -934,7 +851,7 @@ function createEmailCommand() {
   templates.command("list").description("List email templates").option("--server <id>", "Filter by server ID").option("--status <status>", "Filter by status (DRAFT, ACTIVE, ARCHIVED)").option("--limit <n>", "Max results", "50").option("-o, --org <slug>", "Organization slug").option("--json", "Output as JSON").action(async (options) => {
     requireLogin();
     const client = getApiClient(options.org);
-    const result = await client.get("/email/templates", {
+    const result = await client.get("/templates", {
       serverId: options.server ? parseInt(options.server, 10) : void 0,
       status: options.status,
       limit: parseInt(options.limit, 10)
@@ -959,7 +876,7 @@ function createEmailCommand() {
   templates.command("get <id>").description("Get template details").option("-o, --org <slug>", "Organization slug").option("--json", "Output as JSON").action(async (id, options) => {
     requireLogin();
     const client = getApiClient(options.org);
-    const result = await client.get(`/email/templates/${id}`);
+    const result = await client.get(`/templates/${id}`);
     if (!result.success || !result.data) {
       printError(result.error?.message || "Failed to get template");
       process.exit(1);
@@ -970,7 +887,7 @@ function createEmailCommand() {
     requireLogin();
     const spinner = ora2("Creating template...").start();
     const client = getApiClient(options.org);
-    const result = await client.post("/email/templates", {
+    const result = await client.post("/templates", {
       name: options.name,
       subject: options.subject,
       serverId: parseInt(options.server, 10),
@@ -995,7 +912,7 @@ function createEmailCommand() {
     requireLogin();
     const spinner = ora2("Updating template...").start();
     const client = getApiClient(options.org);
-    const result = await client.patch(`/email/templates/${id}`, {
+    const result = await client.patch(`/templates/${id}`, {
       name: options.name,
       subject: options.subject,
       alias: options.alias,
@@ -1020,7 +937,7 @@ function createEmailCommand() {
     }
     const spinner = ora2("Deleting template...").start();
     const client = getApiClient(options.org);
-    const result = await client.delete(`/email/templates/${id}`);
+    const result = await client.delete(`/templates/${id}`);
     if (!result.success) {
       spinner.fail("Failed to delete template");
       printError(result.error?.message || "Unknown error");
@@ -1032,19 +949,20 @@ function createEmailCommand() {
   domains.command("list").description("List email domains").option("-o, --org <slug>", "Organization slug").option("--json", "Output as JSON").action(async (options) => {
     requireLogin();
     const client = getApiClient(options.org);
-    const result = await client.get("/email/domains");
+    const result = await client.get("/domains");
     if (!result.success || !result.data) {
       printError(result.error?.message || "Failed to list domains");
       process.exit(1);
     }
     if (options.json) {
-      print(result.data, "json");
+      print(result.data.domains, "json");
     } else {
-      const data = result.data.map((d) => ({
+      const data = result.data.domains.map((d) => ({
         id: d.id,
-        domain: d.domain,
+        domain: d.name,
         status: d.status,
-        verified: d.verifiedAt || "-"
+        dkimVerified: d.dkimVerified ? "Yes" : "No",
+        spfVerified: d.spfVerified ? "Yes" : "No"
       }));
       print(data);
     }
@@ -1053,7 +971,7 @@ function createEmailCommand() {
     requireLogin();
     const spinner = ora2("Adding domain...").start();
     const client = getApiClient(options.org);
-    const result = await client.post("/email/domains", { domain });
+    const result = await client.post("/domains", { domain });
     if (!result.success || !result.data) {
       spinner.fail("Failed to add domain");
       printError(result.error?.message || "Unknown error");
@@ -1075,7 +993,7 @@ ${record.type}:`);
     requireLogin();
     const spinner = ora2("Verifying domain...").start();
     const client = getApiClient(options.org);
-    const result = await client.post(`/email/domains/${id}/verify`);
+    const result = await client.post(`/domains/${id}/verify`);
     if (!result.success || !result.data) {
       spinner.fail("Domain verification failed");
       printError(result.error?.message || "Unknown error");
@@ -1085,10 +1003,15 @@ ${record.type}:`);
       spinner.succeed("Domain verified!");
     } else {
       spinner.info("Verification in progress");
-      console.log("\nDNS Record Status:");
-      for (const record of result.data.dnsRecords) {
-        const status = record.verified ? "\u2713" : "\u2717";
-        console.log(`  ${status} ${record.type}: ${record.name}`);
+      console.log("\nVerification Status:");
+      const checkmark = (verified) => verified ? "\u2713" : "\u2717";
+      console.log(`  ${checkmark(result.data.dkimVerified)} DKIM`);
+      console.log(`  ${checkmark(result.data.spfVerified)} SPF`);
+      console.log(`  ${checkmark(result.data.returnPathVerified)} Return-Path`);
+      console.log(`  ${checkmark(result.data.dmarcVerified)} DMARC`);
+      if (result.data.verificationError) {
+        console.log(`
+Error: ${result.data.verificationError}`);
       }
     }
     if (options.json) {
@@ -1103,7 +1026,7 @@ ${record.type}:`);
     }
     const spinner = ora2("Deleting domain...").start();
     const client = getApiClient(options.org);
-    const result = await client.delete(`/email/domains/${id}`);
+    const result = await client.delete(`/domains/${id}`);
     if (!result.success) {
       spinner.fail("Failed to delete domain");
       printError(result.error?.message || "Unknown error");
@@ -1115,20 +1038,19 @@ ${record.type}:`);
   senders.command("list").description("List email senders").option("-o, --org <slug>", "Organization slug").option("--json", "Output as JSON").action(async (options) => {
     requireLogin();
     const client = getApiClient(options.org);
-    const result = await client.get("/email/senders");
+    const result = await client.get("/senders");
     if (!result.success || !result.data) {
       printError(result.error?.message || "Failed to list senders");
       process.exit(1);
     }
     if (options.json) {
-      print(result.data, "json");
+      print(result.data.senders, "json");
     } else {
-      const data = result.data.map((s) => ({
+      const data = result.data.senders.map((s) => ({
         id: s.id,
         email: s.email,
         name: s.name || "-",
-        status: s.status,
-        verified: s.verifiedAt || "-"
+        status: s.status
       }));
       print(data);
     }
@@ -1137,7 +1059,7 @@ ${record.type}:`);
     requireLogin();
     const spinner = ora2("Adding sender...").start();
     const client = getApiClient(options.org);
-    const result = await client.post("/email/senders", {
+    const result = await client.post("/senders", {
       email: emailAddr,
       name: options.name
     });
@@ -1156,7 +1078,7 @@ ${record.type}:`);
     }
     const spinner = ora2("Deleting sender...").start();
     const client = getApiClient(options.org);
-    const result = await client.delete(`/email/senders/${id}`);
+    const result = await client.delete(`/senders/${id}`);
     if (!result.success) {
       spinner.fail("Failed to delete sender");
       printError(result.error?.message || "Unknown error");
@@ -1165,18 +1087,25 @@ ${record.type}:`);
     spinner.succeed("Sender deleted!");
   });
   const suppressions = emailCmd.command("suppressions").description("Manage email suppressions");
-  suppressions.command("list").description("List email suppressions").option("-o, --org <slug>", "Organization slug").option("--json", "Output as JSON").action(async (options) => {
+  suppressions.command("list").description("List email suppressions").option("-o, --org <slug>", "Organization slug").option("--server <id>", "Filter by server ID").option("--json", "Output as JSON").action(async (options) => {
     requireLogin();
     const client = getApiClient(options.org);
-    const result = await client.get("/email/suppressions");
+    const params = new URLSearchParams();
+    if (options.server) {
+      params.set("serverId", options.server);
+    }
+    const queryString = params.toString();
+    const url = queryString ? `/suppressions?${queryString}` : "/suppressions";
+    const result = await client.get(url);
     if (!result.success || !result.data) {
       printError(result.error?.message || "Failed to list suppressions");
       process.exit(1);
     }
     if (options.json) {
-      print(result.data, "json");
+      print(result.data.data, "json");
     } else {
-      const data = result.data.map((s) => ({
+      const data = result.data.data.map((s) => ({
+        id: s.id,
         email: s.email,
         reason: s.reason,
         created: s.createdAt
@@ -1184,11 +1113,16 @@ ${record.type}:`);
       print(data);
     }
   });
-  suppressions.command("add <email>").description("Add email to suppression list").option("-o, --org <slug>", "Organization slug").action(async (emailAddr, options) => {
+  suppressions.command("add <email>").description("Add email to suppression list").option("-o, --org <slug>", "Organization slug").requiredOption("--server <id>", "Server ID to add suppression to").option("--reason <reason>", "Suppression reason (HARD_BOUNCE, SPAM_COMPLAINT, MANUAL, UNSUBSCRIBE)", "MANUAL").option("--notes <notes>", "Optional notes").action(async (emailAddr, options) => {
     requireLogin();
     const spinner = ora2("Adding to suppression list...").start();
     const client = getApiClient(options.org);
-    const result = await client.post("/email/suppressions", { email: emailAddr });
+    const result = await client.post("/suppressions", {
+      email: emailAddr,
+      serverId: parseInt(options.server, 10),
+      reason: options.reason,
+      notes: options.notes
+    });
     if (!result.success) {
       spinner.fail("Failed to add suppression");
       printError(result.error?.message || "Unknown error");
@@ -1196,10 +1130,10 @@ ${record.type}:`);
     }
     spinner.succeed("Email added to suppression list!");
   });
-  suppressions.command("remove <email>").description("Remove email from suppression list").option("-o, --org <slug>", "Organization slug").action(async (emailAddr, options) => {
+  suppressions.command("remove <id>").description("Remove suppression by ID").option("-o, --org <slug>", "Organization slug").action(async (id, options) => {
     requireLogin();
     const shouldRemove = await confirm(
-      `Are you sure you want to remove ${emailAddr} from the suppression list?`,
+      `Are you sure you want to remove suppression #${id}?`,
       false
     );
     if (!shouldRemove) {
@@ -1207,18 +1141,18 @@ ${record.type}:`);
     }
     const spinner = ora2("Removing from suppression list...").start();
     const client = getApiClient(options.org);
-    const result = await client.delete(`/email/suppressions/${encodeURIComponent(emailAddr)}`);
+    const result = await client.delete(`/suppressions/${id}`);
     if (!result.success) {
       spinner.fail("Failed to remove suppression");
       printError(result.error?.message || "Unknown error");
       process.exit(1);
     }
-    spinner.succeed("Email removed from suppression list!");
+    spinner.succeed("Suppression removed!");
   });
   emailCmd.command("stats").description("Get email statistics").option("--period <period>", "Period (day, week, month)", "week").option("--server <id>", "Filter by server ID").option("--stream <id>", "Filter by stream ID").option("-o, --org <slug>", "Organization slug").option("--json", "Output as JSON").action(async (options) => {
     requireLogin();
     const client = getApiClient(options.org);
-    const result = await client.get("/email/stats", {
+    const result = await client.get("/stats/outbound", {
       period: options.period,
       serverId: options.server ? parseInt(options.server, 10) : void 0,
       streamId: options.stream ? parseInt(options.stream, 10) : void 0

@@ -7,11 +7,10 @@
 
 import open from 'open';
 import {
-  getWebUrl,
   getApiUrl,
+  getWebUrl,
   storeToken,
   storeUserInfo,
-  getToken,
   clearCredentials,
   getCurrentOrganization,
   setCurrentOrganization,
@@ -26,7 +25,6 @@ import type { CommandResult, WhoamiResponse, OrganizationInfo } from './types';
 interface DeviceCodeResponse {
   deviceCode: string;
   userCode: string;
-  verificationUrl: string;
   expiresIn: number;
   interval: number;
 }
@@ -57,13 +55,14 @@ interface TokenErrorResponse {
 
 /**
  * Request a device code from the API
+ * Uses apiUrl since device-code endpoint is on the Hono API server
  */
 async function requestDeviceCode(
   sessionType: 'CLI' | 'MCP' = 'CLI'
 ): Promise<DeviceCodeResponse> {
-  const webUrl = getWebUrl();
+  const apiUrl = getApiUrl();
 
-  const response = await fetch(`${webUrl}/api/cli/device-code`, {
+  const response = await fetch(`${apiUrl}/cli/device-code`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -82,8 +81,13 @@ async function requestDeviceCode(
   });
 
   if (!response.ok) {
-    const errorData = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(errorData.error || 'Failed to get device code');
+    const errorData = (await response.json().catch(() => ({}))) as {
+      error?: string | { code?: string; message?: string }
+    };
+    const errorMsg = typeof errorData.error === 'string'
+      ? errorData.error
+      : errorData.error?.message || 'Failed to get device code';
+    throw new Error(errorMsg);
   }
 
   return response.json() as Promise<DeviceCodeResponse>;
@@ -91,6 +95,7 @@ async function requestDeviceCode(
 
 /**
  * Poll for token using device code
+ * Uses apiUrl since token endpoint is on the Hono API server
  */
 async function pollForToken(
   deviceCode: string,
@@ -98,14 +103,14 @@ async function pollForToken(
   expiresIn: number,
   onPoll?: () => void
 ): Promise<TokenResponse> {
-  const webUrl = getWebUrl();
+  const apiUrl = getApiUrl();
   const startTime = Date.now();
   const expiresAt = startTime + expiresIn * 1000;
 
   while (Date.now() < expiresAt) {
     if (onPoll) onPoll();
 
-    const response = await fetch(`${webUrl}/api/cli/token`, {
+    const response = await fetch(`${apiUrl}/cli/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -163,8 +168,11 @@ export async function login(
   try {
     // Step 1: Request device code
     const deviceCodeResponse = await requestDeviceCode(sessionType);
-    const { deviceCode, userCode, verificationUrl, expiresIn, interval } =
-      deviceCodeResponse;
+    const { deviceCode, userCode, expiresIn, interval } = deviceCodeResponse;
+
+    // Build verification URL using CLI's configured webUrl
+    const webUrl = getWebUrl();
+    const verificationUrl = `${webUrl}/cli/authorize?user_code=${userCode}`;
 
     // Notify about the user code
     if (callbacks?.onDeviceCode) {

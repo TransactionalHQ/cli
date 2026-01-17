@@ -51,13 +51,6 @@ interface CommandResult<T> {
     };
 }
 /**
- * Stored organization credentials
- */
-interface OrganizationCredentials {
-    token: string;
-    expiresAt?: string;
-}
-/**
  * User information stored in credentials
  */
 interface UserInfo {
@@ -66,7 +59,7 @@ interface UserInfo {
     name?: string;
 }
 /**
- * Organization info stored in credentials
+ * Organization info from API
  */
 interface OrganizationInfo {
     id: number;
@@ -76,11 +69,13 @@ interface OrganizationInfo {
 }
 /**
  * Stored credentials file structure
+ * Version 2: User-scoped token (not per-org)
  */
 interface StoredCredentials {
     version: number;
+    token?: string;
+    expiresAt?: string;
     user?: UserInfo;
-    organizations: Record<string, OrganizationCredentials>;
     currentOrganization?: string;
 }
 /**
@@ -160,16 +155,34 @@ interface EmailStream {
  */
 interface EmailDomain {
     id: number;
-    domain: string;
+    name: string;
     status: string;
-    verifiedAt?: string;
-    dnsRecords: Array<{
-        type: string;
-        name: string;
-        value: string;
-        verified?: boolean;
-    }>;
-    createdAt: string;
+    dkimVerified: boolean;
+    spfVerified: boolean;
+    returnPathVerified: boolean;
+    dmarcVerified: boolean;
+    createdAt?: string;
+    lastVerifiedAt?: string;
+    verificationError?: string | null;
+}
+/**
+ * DNS Record for domain verification
+ */
+interface DnsRecord {
+    type: string;
+    recordType: string;
+    name: string;
+    value: string;
+    verified: boolean;
+}
+/**
+ * Domain create response
+ */
+interface DomainCreateResponse extends EmailDomain {
+    dkimSelector: string;
+    dkimPublicKey: string;
+    dkimRecordValue: string;
+    dnsRecords: DnsRecord[];
 }
 /**
  * Email sender
@@ -186,8 +199,12 @@ interface EmailSender {
  * Email suppression
  */
 interface EmailSuppression {
+    id: number;
     email: string;
     reason: string;
+    notes: string | null;
+    serverId: number | null;
+    streamId: number | null;
     createdAt: string;
 }
 /**
@@ -302,7 +319,7 @@ interface WhoamiResponse {
         name: string;
         slug: string;
         role: string;
-    };
+    } | null;
     session: {
         id: number;
         type: string;
@@ -362,23 +379,15 @@ declare function getCurrentOrganization(): string | undefined;
  */
 declare function setCurrentOrganization(orgSlug: string): void;
 /**
- * Get token for an organization
+ * Get the stored user token
  */
-declare function getOrganizationToken(orgSlug?: string): string | undefined;
+declare function getToken(): string | undefined;
 /**
- * Store token for an organization
+ * Store the user token
  */
-declare function storeOrganizationToken(orgSlug: string, token: string, expiresAt?: string): void;
+declare function storeToken(token: string, expiresInSeconds: number): void;
 /**
- * Remove token for an organization
- */
-declare function removeOrganizationToken(orgSlug: string): void;
-/**
- * Get all authenticated organizations
- */
-declare function getAuthenticatedOrganizations(): string[];
-/**
- * Check if user is logged in to any organization
+ * Check if user is logged in
  */
 declare function isLoggedIn(): boolean;
 /**
@@ -402,9 +411,9 @@ declare function getUserInfo(): {
     name?: string;
 } | undefined;
 /**
- * Switch to a different organization
+ * Switch to a different organization (just updates local selection)
  */
-declare function switchOrganization(orgSlug: string): boolean;
+declare function switchOrganization(orgSlug: string): void;
 /**
  * Get config directory path
  */
@@ -427,10 +436,12 @@ declare function initConfig(): CliConfig;
 
 /**
  * HTTP API client for making authenticated requests
+ * All API requests go to the Hono API server (apiUrl)
  */
 declare class ApiClient {
-    private baseUrl;
+    private apiUrl;
     private token;
+    private orgSlug;
     constructor(orgSlug?: string);
     /**
      * Get headers for API requests
@@ -472,27 +483,35 @@ declare function getApiClient(orgSlug?: string): ApiClient;
 /**
  * Check if the user is authenticated for API calls
  */
-declare function isAuthenticated(orgSlug?: string): boolean;
+declare function isAuthenticated(): boolean;
 
 /**
  * Authentication
  *
- * Handles OAuth2 device authorization flow for CLI login.
+ * Handles device authorization flow for CLI login.
+ * No local server needed - CLI polls the API until user authorizes.
  */
 
 /**
- * Perform OAuth login flow
+ * Perform device authorization login flow
  */
-declare function login(sessionType?: 'cli' | 'mcp', onBrowserOpen?: () => void): Promise<CommandResult<{
+declare function login(sessionType?: 'CLI' | 'MCP', callbacks?: {
+    onDeviceCode?: (userCode: string, verificationUrl: string) => void;
+    onBrowserOpen?: () => void;
+    onPolling?: () => void;
+}): Promise<CommandResult<{
     user: {
         id: string;
         email: string;
         name?: string;
     };
-    organization: OrganizationInfo;
+    organizations: Array<{
+        id: number;
+        role: string;
+    }>;
 }>>;
 /**
- * Logout from all organizations
+ * Logout - clear all credentials
  */
 declare function logout(): void;
 /**
@@ -523,11 +542,11 @@ declare function createLogoutCommand(): Command;
  */
 declare function createWhoamiCommand(): Command;
 /**
- * Create the switch command
+ * Create the switch command (alias for org use)
  */
 declare function createSwitchCommand(): Command;
 /**
- * Create the orgs list command
+ * Create the org command with subcommands
  */
 declare function createOrgsCommand(): Command;
 
@@ -661,4 +680,4 @@ declare function editor(message: string, options?: {
  */
 declare function createProgram(): Command;
 
-export { ApiClient, type ApiErrorResponse, type ApiKeyInfo, type ApiResponse, type BillingUsage, type CliConfig, CliSessionType, type CommandResult, type CreateApiKeyResult, type EmailDomain, type EmailSendOptions, type EmailSendResult, type EmailSender, type EmailServer, type EmailStats, type EmailStream, type EmailSuppression, type EmailTemplate, type Invoice, type OrgMember, type OrganizationCredentials, type OrganizationInfo, type OutputFormat, type PlanInfo, type StoredCredentials, type UserInfo, type WhoamiResponse, clearCredentials, confirm, createConfigCommand, createEmailCommand, createLoginCommand, createLogoutCommand, createOrgsCommand, createProgram, createSwitchCommand, createWhoamiCommand, editor, emailInput, formatOutput, getApiClient, getApiUrl, getAuthenticatedOrganizations, getConfig, getConfigDir, getCredentialsFile, getCurrentOrganization, getOrganizationToken, getOutputFormat, getUserInfo, getWebUrl, initConfig, input, isAuthenticated, isColorEnabled, isLoggedIn, listOrganizations, loadConfig, loadCredentials, login, logout, multiSelect, password, print, printError, printHeading, printInfo, printKeyValue, printSuccess, printWarning, removeOrganizationToken, saveConfig, saveCredentials, select, selectOrganization, setCurrentOrganization, storeOrganizationToken, storeUserInfo, switchOrganization, whoami };
+export { ApiClient, type ApiErrorResponse, type ApiKeyInfo, type ApiResponse, type BillingUsage, type CliConfig, CliSessionType, type CommandResult, type CreateApiKeyResult, type DnsRecord, type DomainCreateResponse, type EmailDomain, type EmailSendOptions, type EmailSendResult, type EmailSender, type EmailServer, type EmailStats, type EmailStream, type EmailSuppression, type EmailTemplate, type Invoice, type OrgMember, type OrganizationInfo, type OutputFormat, type PlanInfo, type StoredCredentials, type UserInfo, type WhoamiResponse, clearCredentials, confirm, createConfigCommand, createEmailCommand, createLoginCommand, createLogoutCommand, createOrgsCommand, createProgram, createSwitchCommand, createWhoamiCommand, editor, emailInput, formatOutput, getApiClient, getApiUrl, getConfig, getConfigDir, getCredentialsFile, getCurrentOrganization, getOutputFormat, getToken, getUserInfo, getWebUrl, initConfig, input, isAuthenticated, isColorEnabled, isLoggedIn, listOrganizations, loadConfig, loadCredentials, login, logout, multiSelect, password, print, printError, printHeading, printInfo, printKeyValue, printSuccess, printWarning, saveConfig, saveCredentials, select, selectOrganization, setCurrentOrganization, storeToken, storeUserInfo, switchOrganization, whoami };

@@ -15,6 +15,7 @@ import type {
   EmailSendResult,
   EmailTemplate,
   EmailDomain,
+  DomainCreateResponse,
   EmailSender,
   EmailSuppression,
   EmailStats,
@@ -166,7 +167,7 @@ export function createEmailCommand(): Command {
       requireLogin();
 
       const client = getApiClient(options.org);
-      const result = await client.get<EmailTemplate[]>('/email/templates', {
+      const result = await client.get<EmailTemplate[]>('/templates', {
         serverId: options.server ? parseInt(options.server, 10) : undefined,
         status: options.status,
         limit: parseInt(options.limit, 10),
@@ -200,7 +201,7 @@ export function createEmailCommand(): Command {
       requireLogin();
 
       const client = getApiClient(options.org);
-      const result = await client.get<EmailTemplate>(`/email/templates/${id}`);
+      const result = await client.get<EmailTemplate>(`/templates/${id}`);
 
       if (!result.success || !result.data) {
         printError(result.error?.message || 'Failed to get template');
@@ -227,7 +228,7 @@ export function createEmailCommand(): Command {
       const spinner = ora('Creating template...').start();
 
       const client = getApiClient(options.org);
-      const result = await client.post<EmailTemplate>('/email/templates', {
+      const result = await client.post<EmailTemplate>('/templates', {
         name: options.name,
         subject: options.subject,
         serverId: parseInt(options.server, 10),
@@ -268,7 +269,7 @@ export function createEmailCommand(): Command {
       const spinner = ora('Updating template...').start();
 
       const client = getApiClient(options.org);
-      const result = await client.patch<EmailTemplate>(`/email/templates/${id}`, {
+      const result = await client.patch<EmailTemplate>(`/templates/${id}`, {
         name: options.name,
         subject: options.subject,
         alias: options.alias,
@@ -304,7 +305,7 @@ export function createEmailCommand(): Command {
       const spinner = ora('Deleting template...').start();
 
       const client = getApiClient(options.org);
-      const result = await client.delete(`/email/templates/${id}`);
+      const result = await client.delete(`/templates/${id}`);
 
       if (!result.success) {
         spinner.fail('Failed to delete template');
@@ -327,7 +328,7 @@ export function createEmailCommand(): Command {
       requireLogin();
 
       const client = getApiClient(options.org);
-      const result = await client.get<EmailDomain[]>('/email/domains');
+      const result = await client.get<{ totalCount: number; domains: EmailDomain[] }>('/domains');
 
       if (!result.success || !result.data) {
         printError(result.error?.message || 'Failed to list domains');
@@ -335,13 +336,14 @@ export function createEmailCommand(): Command {
       }
 
       if (options.json) {
-        print(result.data, 'json');
+        print(result.data.domains, 'json');
       } else {
-        const data = result.data.map((d) => ({
+        const data = result.data.domains.map((d) => ({
           id: d.id,
-          domain: d.domain,
+          domain: d.name,
           status: d.status,
-          verified: d.verifiedAt || '-',
+          dkimVerified: d.dkimVerified ? 'Yes' : 'No',
+          spfVerified: d.spfVerified ? 'Yes' : 'No',
         }));
         print(data);
       }
@@ -358,7 +360,7 @@ export function createEmailCommand(): Command {
       const spinner = ora('Adding domain...').start();
 
       const client = getApiClient(options.org);
-      const result = await client.post<EmailDomain>('/email/domains', { domain });
+      const result = await client.post<DomainCreateResponse>('/domains', { domain });
 
       if (!result.success || !result.data) {
         spinner.fail('Failed to add domain');
@@ -391,7 +393,7 @@ export function createEmailCommand(): Command {
       const spinner = ora('Verifying domain...').start();
 
       const client = getApiClient(options.org);
-      const result = await client.post<EmailDomain>(`/email/domains/${id}/verify`);
+      const result = await client.post<EmailDomain>(`/domains/${id}/verify`);
 
       if (!result.success || !result.data) {
         spinner.fail('Domain verification failed');
@@ -403,10 +405,14 @@ export function createEmailCommand(): Command {
         spinner.succeed('Domain verified!');
       } else {
         spinner.info('Verification in progress');
-        console.log('\nDNS Record Status:');
-        for (const record of result.data.dnsRecords) {
-          const status = record.verified ? '\u2713' : '\u2717';
-          console.log(`  ${status} ${record.type}: ${record.name}`);
+        console.log('\nVerification Status:');
+        const checkmark = (verified: boolean) => verified ? '\u2713' : '\u2717';
+        console.log(`  ${checkmark(result.data.dkimVerified)} DKIM`);
+        console.log(`  ${checkmark(result.data.spfVerified)} SPF`);
+        console.log(`  ${checkmark(result.data.returnPathVerified)} Return-Path`);
+        console.log(`  ${checkmark(result.data.dmarcVerified)} DMARC`);
+        if (result.data.verificationError) {
+          console.log(`\nError: ${result.data.verificationError}`);
         }
       }
 
@@ -430,7 +436,7 @@ export function createEmailCommand(): Command {
       const spinner = ora('Deleting domain...').start();
 
       const client = getApiClient(options.org);
-      const result = await client.delete(`/email/domains/${id}`);
+      const result = await client.delete(`/domains/${id}`);
 
       if (!result.success) {
         spinner.fail('Failed to delete domain');
@@ -453,7 +459,7 @@ export function createEmailCommand(): Command {
       requireLogin();
 
       const client = getApiClient(options.org);
-      const result = await client.get<EmailSender[]>('/email/senders');
+      const result = await client.get<{ totalCount: number; senders: EmailSender[] }>('/senders');
 
       if (!result.success || !result.data) {
         printError(result.error?.message || 'Failed to list senders');
@@ -461,14 +467,13 @@ export function createEmailCommand(): Command {
       }
 
       if (options.json) {
-        print(result.data, 'json');
+        print(result.data.senders, 'json');
       } else {
-        const data = result.data.map((s) => ({
+        const data = result.data.senders.map((s) => ({
           id: s.id,
           email: s.email,
           name: s.name || '-',
           status: s.status,
-          verified: s.verifiedAt || '-',
         }));
         print(data);
       }
@@ -485,7 +490,7 @@ export function createEmailCommand(): Command {
       const spinner = ora('Adding sender...').start();
 
       const client = getApiClient(options.org);
-      const result = await client.post<EmailSender>('/email/senders', {
+      const result = await client.post<EmailSender>('/senders', {
         email: emailAddr,
         name: options.name,
       });
@@ -514,7 +519,7 @@ export function createEmailCommand(): Command {
       const spinner = ora('Deleting sender...').start();
 
       const client = getApiClient(options.org);
-      const result = await client.delete(`/email/senders/${id}`);
+      const result = await client.delete(`/senders/${id}`);
 
       if (!result.success) {
         spinner.fail('Failed to delete sender');
@@ -532,12 +537,19 @@ export function createEmailCommand(): Command {
     .command('list')
     .description('List email suppressions')
     .option('-o, --org <slug>', 'Organization slug')
+    .option('--server <id>', 'Filter by server ID')
     .option('--json', 'Output as JSON')
     .action(async (options) => {
       requireLogin();
 
       const client = getApiClient(options.org);
-      const result = await client.get<EmailSuppression[]>('/email/suppressions');
+      const params = new URLSearchParams();
+      if (options.server) {
+        params.set('serverId', options.server);
+      }
+      const queryString = params.toString();
+      const url = queryString ? `/suppressions?${queryString}` : '/suppressions';
+      const result = await client.get<{ data: EmailSuppression[]; totalCount: number }>(url);
 
       if (!result.success || !result.data) {
         printError(result.error?.message || 'Failed to list suppressions');
@@ -545,9 +557,10 @@ export function createEmailCommand(): Command {
       }
 
       if (options.json) {
-        print(result.data, 'json');
+        print(result.data.data, 'json');
       } else {
-        const data = result.data.map((s) => ({
+        const data = result.data.data.map((s) => ({
+          id: s.id,
           email: s.email,
           reason: s.reason,
           created: s.createdAt,
@@ -560,13 +573,21 @@ export function createEmailCommand(): Command {
     .command('add <email>')
     .description('Add email to suppression list')
     .option('-o, --org <slug>', 'Organization slug')
+    .requiredOption('--server <id>', 'Server ID to add suppression to')
+    .option('--reason <reason>', 'Suppression reason (HARD_BOUNCE, SPAM_COMPLAINT, MANUAL, UNSUBSCRIBE)', 'MANUAL')
+    .option('--notes <notes>', 'Optional notes')
     .action(async (emailAddr: string, options) => {
       requireLogin();
 
       const spinner = ora('Adding to suppression list...').start();
 
       const client = getApiClient(options.org);
-      const result = await client.post<EmailSuppression>('/email/suppressions', { email: emailAddr });
+      const result = await client.post<EmailSuppression>('/suppressions', {
+        email: emailAddr,
+        serverId: parseInt(options.server, 10),
+        reason: options.reason,
+        notes: options.notes,
+      });
 
       if (!result.success) {
         spinner.fail('Failed to add suppression');
@@ -578,14 +599,14 @@ export function createEmailCommand(): Command {
     });
 
   suppressions
-    .command('remove <email>')
-    .description('Remove email from suppression list')
+    .command('remove <id>')
+    .description('Remove suppression by ID')
     .option('-o, --org <slug>', 'Organization slug')
-    .action(async (emailAddr: string, options) => {
+    .action(async (id: string, options) => {
       requireLogin();
 
       const shouldRemove = await confirm(
-        `Are you sure you want to remove ${emailAddr} from the suppression list?`,
+        `Are you sure you want to remove suppression #${id}?`,
         false
       );
       if (!shouldRemove) {
@@ -595,7 +616,7 @@ export function createEmailCommand(): Command {
       const spinner = ora('Removing from suppression list...').start();
 
       const client = getApiClient(options.org);
-      const result = await client.delete(`/email/suppressions/${encodeURIComponent(emailAddr)}`);
+      const result = await client.delete(`/suppressions/${id}`);
 
       if (!result.success) {
         spinner.fail('Failed to remove suppression');
@@ -603,7 +624,7 @@ export function createEmailCommand(): Command {
         process.exit(1);
       }
 
-      spinner.succeed('Email removed from suppression list!');
+      spinner.succeed('Suppression removed!');
     });
 
   // Stats command
@@ -619,7 +640,7 @@ export function createEmailCommand(): Command {
       requireLogin();
 
       const client = getApiClient(options.org);
-      const result = await client.get<EmailStats>('/email/stats', {
+      const result = await client.get<EmailStats>('/stats/outbound', {
         period: options.period,
         serverId: options.server ? parseInt(options.server, 10) : undefined,
         streamId: options.stream ? parseInt(options.stream, 10) : undefined,
