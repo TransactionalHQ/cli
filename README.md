@@ -1,17 +1,20 @@
-# Transactional CLI
+# transactional-cli
 
 Official command-line interface for [Transactional](https://usetransactional.com) - manage email, SMS, forms, and more from your terminal.
+
+[![npm version](https://badge.fury.io/js/transactional-cli.svg)](https://www.npmjs.com/package/transactional-cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Installation
 
 ```bash
-npm install -g @transactional/cli
+npm install -g transactional-cli
 ```
 
 Or using npx without installation:
 
 ```bash
-npx @transactional/cli login
+npx transactional-cli login
 ```
 
 ## Quick Start
@@ -127,13 +130,13 @@ Create a file `emails.json`:
     "from": "noreply@example.com",
     "to": "user1@example.com",
     "subject": "Hello User 1",
-    "textBody": "Hello from batch!"
+    "text": "Hello from batch!"
   },
   {
     "from": "noreply@example.com",
     "to": "user2@example.com",
     "subject": "Hello User 2",
-    "textBody": "Hello from batch!"
+    "text": "Hello from batch!"
   }
 ]
 ```
@@ -148,6 +151,10 @@ transactional email batch emails.json
 ```bash
 transactional email stats --period month --json
 ```
+
+## Documentation
+
+Full documentation is available at [usetransactional.com/docs/cli](https://usetransactional.com/docs/cli)
 
 ## License
 
