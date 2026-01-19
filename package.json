@@ -1,6 +1,6 @@
 {
   "name": "transactional-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Official CLI for Transactional - manage email, SMS, forms, and more from your terminal",
   "type": "module",
   "main": "./dist/index.js",
