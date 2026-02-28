@@ -39,7 +39,7 @@ jobs:
       - name: Install & Build
         if: steps.skip.outputs.skip != 'true'
         run: |
-          npm ci
+          npm install
           npm run build
 
       - name: Bump version
