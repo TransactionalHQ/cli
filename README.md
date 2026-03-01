@@ -1,20 +1,20 @@
-# transactional-cli
+# @usetransactional/cli
 
 Official command-line interface for [Transactional](https://usetransactional.com) - manage email, SMS, forms, and more from your terminal.
 
-[![npm version](https://badge.fury.io/js/transactional-cli.svg)](https://www.npmjs.com/package/transactional-cli)
+[![npm version](https://badge.fury.io/js/%40usetransactional%2Fcli.svg)](https://www.npmjs.com/package/@usetransactional/cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Installation
 
 ```bash
-npm install -g transactional-cli
+npm install -g @usetransactional/cli
 ```
 
 Or using npx without installation:
 
 ```bash
-npx transactional-cli login
+npx @usetransactional/cli login
 ```
 
 ## Quick Start
