@@ -1,13 +1,15 @@
 {
   "name": "@usetransactional/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CLI tool for Transactional — send emails, SMS, manage domains from the terminal",
   "bin": {
     "transactional": "./dist/bin.js"
   },
   "main": "./dist/index.js",
   "type": "module",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -30,7 +32,13 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": ["transactional", "cli", "email", "sms", "api"],
+  "keywords": [
+    "transactional",
+    "cli",
+    "email",
+    "sms",
+    "api"
+  ],
   "author": "Transactional <support@usetransactional.com>",
   "license": "MIT",
   "publishConfig": {
