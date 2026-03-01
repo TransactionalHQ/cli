@@ -34,8 +34,12 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm
+        if: steps.skip.outputs.skip != 'true'
+        run: npm install -g npm@latest
 
       - name: Install & Build
         if: steps.skip.outputs.skip != 'true'
@@ -66,9 +70,7 @@ jobs:
 
       - name: Publish
         if: steps.skip.outputs.skip != 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance
+        run: npm publish --provenance --access public
 
       - name: Commit & Tag
         if: steps.skip.outputs.skip != 'true'
