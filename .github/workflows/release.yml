@@ -62,7 +62,7 @@ jobs:
 
       - name: Verify shebang
         if: steps.skip.outputs.skip != 'true'
-        run: head -1 dist/index.js | grep -q '#!/usr/bin/env node'
+        run: head -1 dist/bin.js | grep -q '#!/usr/bin/env node'
 
       - name: Publish
         if: steps.skip.outputs.skip != 'true'
