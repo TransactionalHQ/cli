@@ -66,7 +66,7 @@ async function requestDeviceCode(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'User-Agent': 'transactional-cli/0.1.0',
+      'User-Agent': '@usetransactional/cli/0.1.0',
     },
     body: JSON.stringify({
       sessionType,
@@ -114,7 +114,7 @@ async function pollForToken(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'transactional-cli/0.1.0',
+        'User-Agent': '@usetransactional/cli/0.1.0',
       },
       body: JSON.stringify({ deviceCode }),
     });

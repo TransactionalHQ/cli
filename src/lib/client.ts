@@ -33,7 +33,7 @@ export class ApiClient {
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'User-Agent': 'transactional-cli/0.1.0',
+      'User-Agent': '@usetransactional/cli/0.1.0',
     };
 
     if (this.token) {
