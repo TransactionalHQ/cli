@@ -1,6 +1,6 @@
 {
   "name": "@usetransactional/cli",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "CLI tool for Transactional — send emails, SMS, manage domains from the terminal",
   "bin": {
     "transactional": "./dist/bin.js"
