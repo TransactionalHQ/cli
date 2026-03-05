@@ -1681,7 +1681,7 @@ function createMcpCommand() {
 initConfig();
 function createProgram() {
   const program = new Command();
-  program.name("transactional").description("CLI for Transactional - manage email, SMS, forms, and more").version("0.1.2");
+  program.name("transactional").description("CLI for Transactional - manage email, SMS, forms, and more").version("0.1.3");
   program.addCommand(createLoginCommand());
   program.addCommand(createLogoutCommand());
   program.addCommand(createWhoamiCommand());
