@@ -193,7 +193,7 @@ var ApiClient = class {
   getHeaders() {
     const headers = {
       "Content-Type": "application/json",
-      "User-Agent": "transactional-cli/0.1.0"
+      "User-Agent": "@usetransactional/cli/0.1.0"
     };
     if (this.token) {
       headers["Authorization"] = `Bearer ${this.token}`;
@@ -327,7 +327,7 @@ async function requestDeviceCode(sessionType = "CLI") {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "User-Agent": "transactional-cli/0.1.0"
+      "User-Agent": "@usetransactional/cli/0.1.0"
     },
     body: JSON.stringify({
       sessionType,
@@ -357,7 +357,7 @@ async function pollForToken(deviceCode, interval, expiresIn, onPoll) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": "transactional-cli/0.1.0"
+        "User-Agent": "@usetransactional/cli/0.1.0"
       },
       body: JSON.stringify({ deviceCode })
     });
@@ -1681,7 +1681,7 @@ function createMcpCommand() {
 initConfig();
 function createProgram() {
   const program = new Command();
-  program.name("transactional").description("CLI for Transactional - manage email, SMS, forms, and more").version("0.1.0");
+  program.name("transactional").description("CLI for Transactional - manage email, SMS, forms, and more").version("0.1.2");
   program.addCommand(createLoginCommand());
   program.addCommand(createLogoutCommand());
   program.addCommand(createWhoamiCommand());
