@@ -29,7 +29,7 @@ export function createProgram(): Command {
   program
     .name('transactional')
     .description('CLI for Transactional - manage email, SMS, forms, and more')
-    .version('0.1.4');
+    .version('0.1.5');
 
   // Auth commands
   program.addCommand(createLoginCommand());
